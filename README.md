@@ -40,7 +40,8 @@ provides direct access to Hass internals.
 
 `tests/components/pyscript` contains test code
 
-`home-assistant.io/source/_integrations` contains the documentation in markdown format.
+`home-assistant.io/source/_integrations` contains the
+[documentation](https://github.com/craigbarratt/home-assistant-pyscript/blob/master/home-assistant.io/source/_integrations/pyscript.markdown) in markdown format.
 
 ## Copyright
 
