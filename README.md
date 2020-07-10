@@ -1,4 +1,4 @@
-# Home Assistant Pyscripts Python Scripting
+# Home Assistant Pyscript - Python Scripting Component
 
 This integration allows you to write Python functions and scripts that can implement a wide range of
 automation, logic and triggers. State variables are bound to Python variables, and services are
@@ -31,8 +31,8 @@ sleeping, and waiting for triggers.
 
 Pyscript provides functionality that complements the existing automations, templates, and triggers.
 It presents a simplified and more integrated binding for Python scripting than
-[Python Scripts](/integrations/python_script/), which provides direct access to
-Hass internals.
+[Python Scripts](https://www.home-assistant.io/integrations/python_script), which
+provides direct access to Hass internals.
 
 ## Directory tree
 
