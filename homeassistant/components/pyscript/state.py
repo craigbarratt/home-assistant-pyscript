@@ -86,6 +86,7 @@ def set(varName, value, attributes=None):
     _LOGGER.debug(f"setting {varName} = {value}, attr = {attributes}")
     hass.states.async_set(varName, value, attributes)
 
+
 #
 # Check if a State variable exists.  Variables are of the form domain.entity
 # or domain.entity.attribute.
@@ -117,8 +118,8 @@ def get(varName):
 
 
 functions = {
-    "state.get":     lambda *arg, **kw: get(*arg, **kw),
-    "state.set":     lambda *arg, **kw: set(*arg, **kw),
+    "state.get": lambda *arg, **kw: get(*arg, **kw),
+    "state.set": lambda *arg, **kw: set(*arg, **kw),
 }
 
 

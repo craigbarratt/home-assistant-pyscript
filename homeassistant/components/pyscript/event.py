@@ -20,6 +20,7 @@ def hassSet(h):
 Notify = {}
 NotifyRemove = {}
 
+
 async def event_listener(ev):
     """Listen callback for given event which updates any notifications."""
     _LOGGER.debug(f"event_listener({ev})")
@@ -60,7 +61,6 @@ async def update(eventType, funcArgs):
     global Notify
 
     _LOGGER.debug(f"event.update({eventType}, {vars}, {funcArgs})")
-    notify = set()
     if eventType in Notify:
         for q in Notify[eventType]:
             try:

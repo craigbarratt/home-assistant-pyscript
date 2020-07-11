@@ -356,10 +356,10 @@ separated by spaces and correspond to minutes, hours, day-of-month, month, day-o
 |day of week|0-6 (0 is Sun)
 
 Each field can be a `*` (which means "all"), a single number, a range, or comma-separated list of
-numbers or ranges.  Ranges are inclusive.  For example, if you specify hours as `6,10-13` that means
-hours of 6, 10, 11, 12 and 13.  The trigger happens on the next minute, hour, day that matches the
-specification.  See any linux documentation for examples and more details (note: names for days
-of week and months are not supported; only their integer values are).
+numbers or ranges (no spaces).  Ranges are inclusive.  For example, if you specify hours as
+`6,10-13` that means hours of 6,10,11,12,13.  The trigger happens on the next minute, hour,
+day that matches the specification.  See any linux documentation for examples and more details
+(note: names for days of week and months are not supported; only their integer values are).
 
 When the `@time_trigger` occurs, and the function is called, the only keyword argument is
 `trigger_type`, which is set to `"time"`.
@@ -567,7 +567,7 @@ time that satisfies the trigger condition (e.g., a `range` or `once` is now in t
 Otherwise, `task.wait_until()` would never return.
 
 In the special case that `state_check_now=True` and `task.wait_until()` returns immediately, the
-other return variables that capture the variable name and value that just causes the trigger are
+other return variables that capture the variable name and value that just caused the trigger are
 not included in the `dict` - it will just contain `trigger_type="state"`.
 
 `task.wait_until()` is logically equivalent to using the corresponding decorators, with some

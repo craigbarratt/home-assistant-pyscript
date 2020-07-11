@@ -5,18 +5,17 @@ import datetime
 import locale
 import logging
 import math
+import re
 import time
 import traceback
-import re
 
-import homeassistant.helpers.sun as sun
-import homeassistant.components.pyscript.event as event
 import homeassistant.components.pyscript.eval as eval
+import homeassistant.components.pyscript.event as event
 import homeassistant.components.pyscript.handler as handler
 import homeassistant.components.pyscript.state as state
-from homeassistant.util import dt as dt_util
 from homeassistant.const import SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET
-
+import homeassistant.helpers.sun as sun
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,11 +23,19 @@ _LOGGER = logging.getLogger(__name__)
 hass = None
 
 
-async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trigger=None, event_trigger=None, timeout=None, **kwargs):
-    """Implements task.wait_until()."""
+async def wait_until(
+    astCtx,
+    state_trigger=None,
+    state_check_now=True,
+    time_trigger=None,
+    event_trigger=None,
+    timeout=None,
+    **kwargs,
+):
+    """Wait for zero or more triggers, until an optional timeout."""
     if state_trigger is None and time_trigger is None and event_trigger is None:
         if timeout is not None:
-            await asynio.sleep(timeout)
+            await asyncio.sleep(timeout)
             return {"trigger_type": "timeout"}
         else:
             return {"trigger_type": "none"}
@@ -37,7 +44,9 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
     eventTrigExpr = None
     notifyQ = asyncio.Queue(0)
     if state_trigger is not None:
-        stateTrigExpr = eval.AstEval(f"{astCtx.name} wait_until state_trigger", astCtx.globalSymTable)
+        stateTrigExpr = eval.AstEval(
+            f"{astCtx.name} wait_until state_trigger", astCtx.globalSymTable
+        )
         handler.installAstFuncs(stateTrigExpr)
         stateTrigExpr.parse(state_trigger)
         #
@@ -46,7 +55,9 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
         if await stateTrigExpr.eval():
             return {"trigger_type": "state"}
         stateTrigIdent = stateTrigExpr.astGetNames()
-        _LOGGER.debug(f"trigger {astCtx.name} wait_until: watching vars {stateTrigIdent}")
+        _LOGGER.debug(
+            f"trigger {astCtx.name} wait_until: watching vars {stateTrigIdent}"
+        )
         if len(stateTrigIdent) > 0:
             state.notifyAdd(stateTrigIdent, notifyQ)
     if event_trigger is not None:
@@ -54,7 +65,9 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
             event_trigger = [event_trigger]
         event.notifyAdd(event_trigger[0], notifyQ)
         if len(event_trigger) > 1:
-            eventTrigExpr = eval.AstEval(f"trigger {astCtx.name} wait_until event_trigger", astCtx.globalSymTable)
+            eventTrigExpr = eval.AstEval(
+                f"trigger {astCtx.name} wait_until event_trigger", astCtx.globalSymTable
+            )
             handler.installAstFuncs(eventTrigExpr)
             eventTrigExpr.parse(event_trigger[1])
     t0 = time.monotonic()
@@ -63,7 +76,9 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
         if time_trigger is not None:
             now = dt_now()
             timeNext = TimerTriggerNext(time_trigger, now)
-            _LOGGER.debug(f"trigger {astCtx.name} wait_until timeNext = {timeNext}, now = {now}")
+            _LOGGER.debug(
+                f"trigger {astCtx.name} wait_until timeNext = {timeNext}, now = {now}"
+            )
             if timeNext is not None:
                 thisTimeout = (timeNext - now).total_seconds()
         if timeout is not None:
@@ -75,14 +90,18 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
                 thisTimeout = timeLeft
         if thisTimeout is None:
             if state_trigger is None and event_trigger is None:
-                _LOGGER.debug(f"trigger {astCtx.name} wait_until no next time - returning with none")
+                _LOGGER.debug(
+                    f"trigger {astCtx.name} wait_until no next time - returning with none"
+                )
                 return {"trigger_type": "none"}
             _LOGGER.debug(f"trigger {astCtx.name} wait_until no timeout")
             notifyType, notifyInfo = await notifyQ.get()
         else:
             try:
                 _LOGGER.debug(f"trigger {astCtx.name} wait_until {thisTimeout} secs")
-                notifyType, notifyInfo = await asyncio.wait_for(notifyQ.get(), timeout=thisTimeout)
+                notifyType, notifyInfo = await asyncio.wait_for(
+                    notifyQ.get(), timeout=thisTimeout
+                )
             except asyncio.TimeoutError:
                 ret = {"trigger_type": "time"}
                 break
@@ -96,7 +115,9 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
                 ret = notifyInfo
                 break
         else:
-            _LOGGER.error(f"trigger {astCtx.name} wait_until got unexpected queue message {notifyType}")
+            _LOGGER.error(
+                f"trigger {astCtx.name} wait_until got unexpected queue message {notifyType}"
+            )
 
     if stateTrigIdent:
         for name in stateTrigIdent:
@@ -108,9 +129,11 @@ async def wait_until(astCtx, state_trigger=None, state_check_now=True, time_trig
 
 
 def wait_until_factory(astCtx):
-    """Factory that adds the function execution context to the task.wait_until() function."""
+    """Return wapper to call to astFunction with the ast context."""
+
     async def wait_until_call(*arg, **kw):
         return await wait_until(astCtx, *arg, **kw)
+
     return wait_until_call
 
 
@@ -123,8 +146,7 @@ astFunctions = {
 # Mappings of day of week name to number, using US convention of sun is 0.
 # Initialized based on locale at startup.
 #
-dow2int = {
-}
+dow2int = {}
 
 
 def hassSet(h):
@@ -142,17 +164,17 @@ def hassSet(h):
 
 
 def isleap(y):
-    """Returns True or False if y is a leap year."""
+    """Return True or False if y is a leap year."""
     return (y % 4) == 0 and (y % 100) != 0 or (y % 400) == 0
 
 
 def dt_now():
-    """Returns current time."""
+    """Return current time."""
     return datetime.datetime.now()
 
 
 def daysInMon(m, y):
-    """Returns numbers of days in month m of year y, 1 <= m <= 12."""
+    """Return numbers of days in month m of year y, 1 <= m <= 12."""
     dom = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
     m -= 1
@@ -165,15 +187,13 @@ def daysInMon(m, y):
 
 
 def daysBetween(m1, d1, y1, m2, d2, y2):
-    """Calculate the number of days in between m1/d1/y1 and m2/d2/y2."""
+    """Calculate the number of days in between the two dates."""
     d = datetime.date(y2, m2, d2) - datetime.date(y1, m1, d1)
     return round(d.days)
 
 
 def cronGE(cron, fld, curr):
-    """Returns the next value >= curr that matches cron[fld],
-where cron is the 5 element cron definition.  If nothing
-matches then the smallest element is returned."""
+    """Return the next value which is >= curr and matches cron[fld]."""
     min_ge = 1000
     min = 1000
 
@@ -248,10 +268,10 @@ def parseDateTime(dateTimeStr, dayOffset, now):
     m1 = re.split(r"^(\w+).*", s)
     if len(m0) == 5:
         year, month, day = int(m0[1]), int(m0[2]), int(m0[3])
-        dayOffset = 0   # explicit date means no offset
+        dayOffset = 0  # explicit date means no offset
     elif len(m0) == 4:
         month, day = int(m0[1]), int(m0[2])
-        dayOffset = 0   # explicit date means no offset
+        dayOffset = 0  # explicit date means no offset
     elif len(m1) == 3:
         if m1[1] in dow2int:
             dow = dow2int[m1[1]]
@@ -277,7 +297,7 @@ def parseDateTime(dateTimeStr, dayOffset, now):
     if skip:
         i = s.find(" ")
         if i >= 0:
-            s = s[i+1:].strip()
+            s = s[i + 1 :].strip()
         else:
             return now
 
@@ -317,13 +337,13 @@ def parseDateTime(dateTimeStr, dayOffset, now):
     if skip:
         i = s.find(" ")
         if i >= 0:
-            s = s[i+1:].strip()
+            s = s[i + 1 :].strip()
         else:
             return now
     #
     # parse the offset
     #
-    if len(s) > 0 and (s[0] == '+' or s[0] == '-'):
+    if len(s) > 0 and (s[0] == "+" or s[0] == "-"):
         now = now + datetime.timedelta(seconds=parseTimeOffset(s))
     return now
 
@@ -388,14 +408,16 @@ def TimerTriggerNext(timeSpec, now):
             cron = m0[1:6]
             yearNext = now.year
             minNext = cronGE(cron, 0, now.minute)
-            monNext = cronGE(cron, 3, now.month)              # 1-12
-            mdayNext = cronGE(cron, 2, now.day)               # 1-31
+            monNext = cronGE(cron, 3, now.month)  # 1-12
+            mdayNext = cronGE(cron, 2, now.day)  # 1-31
             wdayNext = cronGE(cron, 4, now.isoweekday() % 7)  # 0-6
             today = True
-            if ((cron[2] == "*" and (now.isoweekday() % 7) != wdayNext)
-                    or (cron[4] == "*" and now.day != mdayNext)
-                    or (now.day != mdayNext and (now.isoweekday() % 7) != wdayNext)
-                    or (now.month != monNext)):
+            if (
+                (cron[2] == "*" and (now.isoweekday() % 7) != wdayNext)
+                or (cron[4] == "*" and now.day != mdayNext)
+                or (now.day != mdayNext and (now.isoweekday() % 7) != wdayNext)
+                or (now.month != monNext)
+            ):
                 today = False
             m = now.minute + 1
             if (now.hour + 1) <= cronGE(cron, 1, now.hour):
@@ -416,7 +438,7 @@ def TimerTriggerNext(timeSpec, now):
                 hrNext = cronGE(cron, 1, 0)
 
                 #
-                # calculate the date of the next occurance of this event, which
+                # calculate the date of the next occurrence of this event, which
                 # will be on a different day than the current
                 #
 
@@ -437,7 +459,7 @@ def TimerTriggerNext(timeSpec, now):
 
                 #
                 # based on their respective specifications, day1, and day2 give
-                # the day of the month for the next occurance of this event.
+                # the day of the month for the next occurrence of this event.
                 #
                 if cron[2] == "*" and cron[4] != "*":
                     day1 = day2
@@ -455,7 +477,10 @@ def TimerTriggerNext(timeSpec, now):
                         monNext = cronGE(cron, 3, now.month + 1)
                     # recompute day1 and day2
                     day1 = cronGE(cron, 2, 1)
-                    db = daysBetween(now.month, now.day, now.year, monNext, 1, yearNext) + 1
+                    db = (
+                        daysBetween(now.month, now.day, now.year, monNext, 1, yearNext)
+                        + 1
+                    )
                     wd = ((now.isoweekday() % 7) + db) % 7
                     # wd is the day of the week of the first of month mon
                     wdayNext = cronGE(cron, 4, wd)
@@ -495,7 +520,12 @@ def TimerTriggerNext(timeSpec, now):
                     nextTime = t
             else:
                 # this event occurs today
-                secs = 3600 * (hrNext - now.hour) + 60 * (minNext - now.minute) - now.second - 1e-6 * now.microsecond
+                secs = (
+                    3600 * (hrNext - now.hour)
+                    + 60 * (minNext - now.minute)
+                    - now.second
+                    - 1e-6 * now.microsecond
+                )
                 t = now + datetime.timedelta(seconds=secs)
                 if now < t and (nextTime is None or t < nextTime):
                     nextTime = t
@@ -517,7 +547,9 @@ def TimerTriggerNext(timeSpec, now):
             period = parseTimeOffset(m2[2].strip())
             if now >= start and period > 0:
                 # TODO was t = start + period * (1 + math.floor((now - start) / period))
-                secs = period * (1.0 + math.floor((now - start).total_seconds() / period))
+                secs = period * (
+                    1.0 + math.floor((now - start).total_seconds() / period)
+                )
                 t = start + datetime.timedelta(seconds=secs)
                 if m2[3] is None:
                     if now < t and (nextTime is None or t < nextTime):
@@ -544,10 +576,11 @@ def TimerTriggerNext(timeSpec, now):
     return nextTime
 
 
-class TrigInfo():
+class TrigInfo:
     """Class for all trigger-decorated functions."""
 
     def __init__(self, name, trigCfg):
+        """Create a new TrigInfo."""
         self.name = name
         self.trigCfg = trigCfg
         self.stateTrigger = trigCfg.get("state_trigger", None)
@@ -568,7 +601,9 @@ class TrigInfo():
         _LOGGER.debug(f"trigger {self.name} eventTrigger = {self.eventTrigger}")
 
         if self.stateActive is not None:
-            self.activeExpr = eval.AstEval(f"trigger {self.name} state_active", self.globalSymTable)
+            self.activeExpr = eval.AstEval(
+                f"trigger {self.name} state_active", self.globalSymTable
+            )
             handler.installAstFuncs(self.activeExpr)
             self.activeExpr.parse(self.stateActive)
 
@@ -576,7 +611,9 @@ class TrigInfo():
             self.haveTrigger = True
 
         if self.stateTrigger is not None:
-            self.stateTrigExpr = eval.AstEval(f"trigger {self.name} state_trigger", self.globalSymTable)
+            self.stateTrigExpr = eval.AstEval(
+                f"trigger {self.name} state_trigger", self.globalSymTable
+            )
             handler.installAstFuncs(self.stateTrigExpr)
             self.stateTrigExpr.parse(self.stateTrigger)
             self.stateTrigIdent = self.stateTrigExpr.astGetNames()
@@ -586,14 +623,17 @@ class TrigInfo():
             self.haveTrigger = True
 
         if self.eventTrigger is not None:
-            _LOGGER.debug(f"trigger {self.name} adding eventTrigger {self.eventTrigger[0]}")
+            _LOGGER.debug(
+                f"trigger {self.name} adding eventTrigger {self.eventTrigger[0]}"
+            )
             event.notifyAdd(self.eventTrigger[0], self.notifyQ)
             if len(self.eventTrigger) == 2:
-                self.eventTrigExpr = eval.AstEval(f"trigger {self.name} event_trigger", self.globalSymTable)
+                self.eventTrigExpr = eval.AstEval(
+                    f"trigger {self.name} event_trigger", self.globalSymTable
+                )
                 handler.installAstFuncs(self.eventTrigExpr)
                 self.eventTrigExpr.parse(self.eventTrigger[1])
             self.haveTrigger = True
-
 
     async def stop(self):
         """Stop this trigger task."""
@@ -626,60 +666,119 @@ class TrigInfo():
                 if self.timeTrigger:
                     now = dt_now()
                     timeNext = TimerTriggerNext(self.timeTrigger, now)
-                    _LOGGER.debug(f"trigger {self.name} timeNext = {timeNext}, now = {now}")
+                    _LOGGER.debug(
+                        f"trigger {self.name} timeNext = {timeNext}, now = {now}"
+                    )
                     if timeNext is not None:
                         timeout = (timeNext - now).total_seconds()
                 if timeout is None and self.haveTrigger:
-                    _LOGGER.debug(f"trigger {self.name} waiting for state change or event")
+                    _LOGGER.debug(
+                        f"trigger {self.name} waiting for state change or event"
+                    )
                     notifyType, notifyInfo = await self.notifyQ.get()
                 elif timeout is not None:
                     try:
                         _LOGGER.debug(f"trigger {self.name} waiting for {timeout} secs")
-                        notifyType, notifyInfo = await asyncio.wait_for(self.notifyQ.get(), timeout=timeout)
+                        notifyType, notifyInfo = await asyncio.wait_for(
+                            self.notifyQ.get(), timeout=timeout
+                        )
                     except asyncio.TimeoutError:
                         notifyInfo = {"trigger_type": "time"}
-                        if ((not self.activeExpr or await self.activeExpr.eval())
-                                and (not self.timeActive or TimerActiveCheck(self.timeActive, dt_now()))
-                                and self.action):
-                            _LOGGER.debug(f"trigger {self.name} got timeTrigger, running action")
-                            handler.create_task(self.action.call(self.actionAstCtx, kwargs=notifyInfo))
+                        if (
+                            (not self.activeExpr or await self.activeExpr.eval())
+                            and (
+                                not self.timeActive
+                                or TimerActiveCheck(self.timeActive, dt_now())
+                            )
+                            and self.action
+                        ):
+                            _LOGGER.debug(
+                                f"trigger {self.name} got timeTrigger, running action"
+                            )
+                            handler.create_task(
+                                self.action.call(self.actionAstCtx, kwargs=notifyInfo)
+                            )
                         else:
-                            _LOGGER.debug(f"trigger {self.name} got timeTrigger, but not active")
+                            _LOGGER.debug(
+                                f"trigger {self.name} got timeTrigger, but not active"
+                            )
                         continue
                 if notifyType == "state" or notifyType is None:
                     if notifyInfo:
                         newVars, funcArgs = notifyInfo
                     else:
                         newVars, funcArgs = {}, {}
-                    if ((self.stateTrigExpr is None or await self.stateTrigExpr.eval(newVars))
-                            and (self.activeExpr is None or await self.activeExpr.eval(newVars))
-                            and (self.timeActive is None or TimerActiveCheck(self.timeActive, dt_now()))
-                            and self.action):
-                        _LOGGER.debug(f'trigger {self.name} stateTrigExpr = {await self.stateTrigExpr.eval(newVars) if self.stateTrigExpr else None} based on {newVars}')
-                        _LOGGER.debug(f"trigger {self.name} got stateTrigExpr, running action (kwargs = {funcArgs})")
-                        handler.create_task(self.action.call(self.actionAstCtx, kwargs=funcArgs))
+                    if (
+                        (
+                            self.stateTrigExpr is None
+                            or await self.stateTrigExpr.eval(newVars)
+                        )
+                        and (
+                            self.activeExpr is None
+                            or await self.activeExpr.eval(newVars)
+                        )
+                        and (
+                            self.timeActive is None
+                            or TimerActiveCheck(self.timeActive, dt_now())
+                        )
+                        and self.action
+                    ):
+                        _LOGGER.debug(
+                            f"trigger {self.name} stateTrigExpr = {await self.stateTrigExpr.eval(newVars) if self.stateTrigExpr else None} based on {newVars}"
+                        )
+                        _LOGGER.debug(
+                            f"trigger {self.name} got stateTrigExpr, running action (kwargs = {funcArgs})"
+                        )
+                        handler.create_task(
+                            self.action.call(self.actionAstCtx, kwargs=funcArgs)
+                        )
                     else:
-                        _LOGGER.debug(f"trigger {self.name} got stateTrigExpr, but not active")
+                        _LOGGER.debug(
+                            f"trigger {self.name} got stateTrigExpr, but not active"
+                        )
                         # _LOGGER.debug(f'stateTrigExpr = {await self.stateTrigExpr.eval(newVars) if self.stateTrigExpr else None}')
                         # _LOGGER.debug(f'timerActive = {TimerActiveCheck(self.timeActive, dt_now())
                         #                                                       if self.timeActive else None}')
                 elif notifyType == "event":
-                    if ((self.eventTrigExpr is None or await self.eventTrigExpr.eval(notifyInfo))
-                            and (self.activeExpr is None or await self.activeExpr.eval(notifyInfo))
-                            and (self.timeActive is None or TimerActiveCheck(self.timeActive, dt_now()))
-                            and self.action):
-                        _LOGGER.debug(f"trigger {self.name} got eventTrigExpr, running action (kwargs = {notifyInfo})")
-                        handler.create_task(self.action.call(self.actionAstCtx, kwargs=notifyInfo))
+                    if (
+                        (
+                            self.eventTrigExpr is None
+                            or await self.eventTrigExpr.eval(notifyInfo)
+                        )
+                        and (
+                            self.activeExpr is None
+                            or await self.activeExpr.eval(notifyInfo)
+                        )
+                        and (
+                            self.timeActive is None
+                            or TimerActiveCheck(self.timeActive, dt_now())
+                        )
+                        and self.action
+                    ):
+                        _LOGGER.debug(
+                            f"trigger {self.name} got eventTrigExpr, running action (kwargs = {notifyInfo})"
+                        )
+                        handler.create_task(
+                            self.action.call(self.actionAstCtx, kwargs=notifyInfo)
+                        )
                     else:
-                        _LOGGER.debug(f"trigger {self.name} got eventTrigExpr, but not active")
+                        _LOGGER.debug(
+                            f"trigger {self.name} got eventTrigExpr, but not active"
+                        )
                 elif notifyType is not None:
-                    _LOGGER.error(f"trigger {self.name} got unexpected queue message {notifyType}")
+                    _LOGGER.error(
+                        f"trigger {self.name} got unexpected queue message {notifyType}"
+                    )
 
                 #
                 # if there is no time, event or state trigger, then quit
                 # (empty triggers mean run the function once at startup)
                 #
-                if self.stateTrigger is None and self.timeTrigger is None and self.eventTrigger is None:
+                if (
+                    self.stateTrigger is None
+                    and self.timeTrigger is None
+                    and self.eventTrigger is None
+                ):
                     _LOGGER.debug(f"trigger {self.name} returning")
                     return
             except asyncio.CancelledError:

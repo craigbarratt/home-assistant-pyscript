@@ -2,25 +2,26 @@
 
 from collections import OrderedDict
 import glob
+import io
 import logging
 import os
-import io
-import time
-import traceback
-import yaml
 
 import voluptuous as vol
-
-from homeassistant.const import SERVICE_RELOAD, EVENT_STATE_CHANGED, EVENT_HOMEASSISTANT_STARTED, MATCH_ALL
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.service import async_set_service_schema
-from homeassistant.loader import bind_hass
+import yaml
 
 import homeassistant.components.pyscript.eval as eval
 import homeassistant.components.pyscript.event as event
+import homeassistant.components.pyscript.handler as handler
 import homeassistant.components.pyscript.state as state
 import homeassistant.components.pyscript.trigger as trigger
-import homeassistant.components.pyscript.handler as handler
+from homeassistant.const import (
+    EVENT_HOMEASSISTANT_STARTED,
+    EVENT_STATE_CHANGED,
+    SERVICE_RELOAD,
+)
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.service import async_set_service_schema
+from homeassistant.loader import bind_hass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,13 +48,15 @@ async def async_setup(hass, config):
 
     triggers, services = await compile_scripts(hass)
 
-    _LOGGER.debug(f"adding reload handler")
+    _LOGGER.debug("adding reload handler")
 
     async def reload_scripts_handler(call):
         """Handle reload service calls."""
         nonlocal triggers, services
 
-        _LOGGER.debug(f"stopping triggers and services, reloading scripts, and restarting")
+        _LOGGER.debug(
+            "stopping triggers and services, reloading scripts, and restarting"
+        )
         for name, trig in triggers.items():
             await trig.stop()
         for name in services:
@@ -69,22 +72,19 @@ async def async_setup(hass, config):
         # attr = ev.data["new_state"].attributes
         newVal = ev.data["new_state"].state
         oldVal = ev.data["old_state"].state if ev.data["old_state"] else None
-        newVars = {
-            varName: newVal,
-            f"{varName}.old": oldVal
-        }
+        newVars = {varName: newVal, f"{varName}.old": oldVal}
         funcArgs = {
             "trigger_type": "state",
             "var_name": varName,
             "value": newVal,
-            "old_value": oldVal
+            "old_value": oldVal,
         }
         await state.update(newVars, funcArgs)
 
     async def start_triggers(ev):
-        _LOGGER.debug(f"adding state changed listener")
+        _LOGGER.debug("adding state changed listener")
         hass.bus.async_listen(EVENT_STATE_CHANGED, state_changed)
-        _LOGGER.debug(f"starting triggers")
+        _LOGGER.debug("starting triggers")
         for name, trig in triggers.items():
             trig.start()
 
@@ -97,7 +97,6 @@ async def async_setup(hass, config):
 async def compile_scripts(hass):
     """Compile all python scripts in FOLDER."""
 
-    symTable = {}
     path = hass.config.path(FOLDER)
 
     _LOGGER.debug(f"compile_scripts: path = {path}")
@@ -118,6 +117,7 @@ async def compile_scripts(hass):
             }
             funcArgs = funcArgs.update(call.data)
             handler.create_task(func.call(astCtx, [], call.data))
+
         return pyscript_service_handler
 
     triggers = {}
@@ -140,9 +140,11 @@ async def compile_scripts(hass):
             if not isinstance(func, eval.EvalFunc):
                 continue
             if name == SERVICE_RELOAD:
-                _LOGGER.error(f"function '{name}' in {file} conflicts with {SERVICE_RELOAD} service; ignoring (please rename)")
+                _LOGGER.error(
+                    f"function '{name}' in {file} conflicts with {SERVICE_RELOAD} service; ignoring (please rename)"
+                )
                 continue
-            desc = func.getDocString();
+            desc = func.getDocString()
             if desc is None or desc == "":
                 desc = f"pyscript function {name}()"
             desc = desc.lstrip(" \n\r")
@@ -150,23 +152,29 @@ async def compile_scripts(hass):
                 try:
                     desc = desc[4:].lstrip(" \n\r")
                     fd = io.StringIO(desc)
-                    service_desc = yaml.load(fd, Loader=yaml.BaseLoader) or OrderedDict()
+                    service_desc = (
+                        yaml.load(fd, Loader=yaml.BaseLoader) or OrderedDict()
+                    )
                     fd.close()
                 except Exception as exc:
-                    _LOGGER.error("Unable to decode yaml doc_string for %s(): %s", name, str(exc))
+                    _LOGGER.error(
+                        "Unable to decode yaml doc_string for %s(): %s", name, str(exc)
+                    )
                     raise HomeAssistantError(exc)
             else:
-                argNames = func.getPositionalArgs()
                 fields = OrderedDict()
                 for arg in func.getPositionalArgs():
                     fields[arg] = OrderedDict(description=f"argument {arg}")
-                service_desc = {
-                    "description": desc,
-                    "fields": fields
-                }
+                service_desc = {"description": desc, "fields": fields}
 
             trigArgs = {}
-            trigDecorators = set(['time_trigger', 'state_trigger', 'event_trigger', 'state_active', 'time_active'])
+            trigDecorators = {
+                "time_trigger",
+                "state_trigger",
+                "event_trigger",
+                "state_active",
+                "time_active",
+            }
             for dec in func.getDecorators():
                 decName, decArgs = dec[0], dec[1]
                 if decName in trigDecorators:
@@ -176,34 +184,60 @@ async def compile_scripts(hass):
                         trigArgs[decName] += decArgs
                 elif decName == "service":
                     if decArgs is not None:
-                        _LOGGER.error("%s defined in %s: decorator @service takes no arguments; ignored", name, file)
+                        _LOGGER.error(
+                            "%s defined in %s: decorator @service takes no arguments; ignored",
+                            name,
+                            file,
+                        )
                         continue
-                    _LOGGER.debug(f"registering {DOMAIN}/{name} (service_desc = {service_desc}")
-                    hass.services.async_register(DOMAIN, name, pyscript_service_factory(name, func, globalSymTable))
+                    _LOGGER.debug(
+                        f"registering {DOMAIN}/{name} (service_desc = {service_desc}"
+                    )
+                    hass.services.async_register(
+                        DOMAIN,
+                        name,
+                        pyscript_service_factory(name, func, globalSymTable),
+                    )
                     async_set_service_schema(hass, DOMAIN, name, service_desc)
                     services.add(name)
                 else:
-                    _LOGGER.warning("%s defined in %s has unkown decorator @%s", name, file, decName)
+                    _LOGGER.warning(
+                        "%s defined in %s has unknown decorator @%s",
+                        name,
+                        file,
+                        decName,
+                    )
             for decName in trigDecorators:
                 if decName in trigArgs and len(trigArgs[decName]) == 0:
                     trigArgs[decName] = None
 
-            argCheck = {'state_trigger': {1}, 'state_active': {1}, 'event_trigger': {1, 2}}
+            argCheck = {
+                "state_trigger": {1},
+                "state_active": {1},
+                "event_trigger": {1, 2},
+            }
             for decName, argCnt in argCheck.items():
                 if decName not in trigArgs or trigArgs[decName] is None:
                     continue
                 if len(trigArgs[decName]) not in argCnt:
-                    _LOGGER.error("%s defined in %s decorator @%s got %d argument%s, expected %s; ignored",
-                                   name, file, decName, len(trigArgs[decName]),
-                                   "s" if len(trigArgs[decName]) > 1 else "",
-                                   " or ".join(sorted(argCnt)))
+                    _LOGGER.error(
+                        "%s defined in %s decorator @%s got %d argument%s, expected %s; ignored",
+                        name,
+                        file,
+                        decName,
+                        len(trigArgs[decName]),
+                        "s" if len(trigArgs[decName]) > 1 else "",
+                        " or ".join(sorted(argCnt)),
+                    )
                     del trigArgs[decName]
                 if argCnt == 1:
                     trigArgs[decName] = trigArgs[decName][0]
-                    
+
             if len(trigArgs) > 0:
                 trigArgs["action"] = func
-                trigArgs["actionAstCtx"] = eval.AstEval(name, globalSymTable=globalSymTable)
+                trigArgs["actionAstCtx"] = eval.AstEval(
+                    name, globalSymTable=globalSymTable
+                )
                 handler.installAstFuncs(trigArgs["actionAstCtx"])
                 trigArgs["globalSymTable"] = globalSymTable
                 triggers[name] = trigger.TrigInfo(name, trigArgs)

@@ -1,4 +1,4 @@
-"""Python interpreter for pyscript"""
+"""Python interpreter for pyscript."""
 
 import ast
 import asyncio
@@ -7,9 +7,8 @@ import logging
 import sys
 import traceback
 
-import homeassistant.components.pyscript.state as state
 import homeassistant.components.pyscript.handler as handler
-
+import homeassistant.components.pyscript.state as state
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,57 +17,57 @@ _LOGGER = logging.getLogger(__name__)
 # to avoid potential security issues.
 #
 builtinFuncs = {
-    "abs":               lambda *arg, **kw: abs(*arg, **kw),
-    "all":               lambda *arg, **kw: all(*arg, **kw),
-    "any":               lambda *arg, **kw: any(*arg, **kw),
-    "ascii":             lambda *arg, **kw: ascii(*arg, **kw),
-    "bin":               lambda *arg, **kw: bin(*arg, **kw),
-    "bool":              lambda *arg, **kw: bool(*arg, **kw),
-    "bytearray":         lambda *arg, **kw: bytearray(*arg, **kw),
+    "abs": lambda *arg, **kw: abs(*arg, **kw),
+    "all": lambda *arg, **kw: all(*arg, **kw),
+    "any": lambda *arg, **kw: any(*arg, **kw),
+    "ascii": lambda *arg, **kw: ascii(*arg, **kw),
+    "bin": lambda *arg, **kw: bin(*arg, **kw),
+    "bool": lambda *arg, **kw: bool(*arg, **kw),
+    "bytearray": lambda *arg, **kw: bytearray(*arg, **kw),
     "bytearray.fromhex": lambda *arg, **kw: bytearray.fromhex(*arg, **kw),
-    "bytes":             lambda *arg, **kw: bytes(*arg, **kw),
-    "bytes.fromhex":     lambda *arg, **kw: bytes.fromhex(*arg, **kw),
-    "callable":          lambda *arg, **kw: callable(*arg, **kw),
-    "chr":               lambda *arg, **kw: chr(*arg, **kw),
-    "complex":           lambda *arg, **kw: complex(*arg, **kw),
-    "dict":              lambda *arg, **kw: dict(*arg, **kw),
-    "divmod":            lambda *arg, **kw: divmod(*arg, **kw),
-    "enumerate":         lambda *arg, **kw: enumerate(*arg, **kw),
-    "filter":            lambda *arg, **kw: filter(*arg, **kw),
-    "float":             lambda *arg, **kw: float(*arg, **kw),
-    "format":            lambda *arg, **kw: format(*arg, **kw),
-    "frozenset":         lambda *arg, **kw: frozenset(*arg, **kw),
-    "hash":              lambda *arg, **kw: hash(*arg, **kw),
-    "hex":               lambda *arg, **kw: hex(*arg, **kw),
-    "int":               lambda *arg, **kw: int(*arg, **kw),
-    "isinstance":        lambda *arg, **kw: isinstance(*arg, **kw),
-    "issubclass":        lambda *arg, **kw: issubclass(*arg, **kw),
-    "iter":              lambda *arg, **kw: iter(*arg, **kw),
-    "len":               lambda *arg, **kw: len(*arg, **kw),
-    "list":              lambda *arg, **kw: list(*arg, **kw),
-    "map":               lambda *arg, **kw: map(*arg, **kw),
-    "max":               lambda *arg, **kw: max(*arg, **kw),
-    "min":               lambda *arg, **kw: min(*arg, **kw),
-    "next":              lambda *arg, **kw: next(*arg, **kw),
-    "oct":               lambda *arg, **kw: oct(*arg, **kw),
-    "ord":               lambda *arg, **kw: ord(*arg, **kw),
-    "pow":               lambda *arg, **kw: pow(*arg, **kw),
-    "range":             lambda *arg, **kw: range(*arg, **kw),
-    "repr":              lambda *arg, **kw: repr(*arg, **kw),
-    "reversed":          lambda *arg, **kw: reversed(*arg, **kw),
-    "round":             lambda *arg, **kw: round(*arg, **kw),
-    "set":               lambda *arg, **kw: set(*arg, **kw),
-    "slice":             lambda *arg, **kw: slice(*arg, **kw),
-    "sorted":            lambda *arg, **kw: sorted(*arg, **kw),
-    "str":               lambda *arg, **kw: str(*arg, **kw),
-    "sum":               lambda *arg, **kw: sum(*arg, **kw),
-    "tuple":             lambda *arg, **kw: tuple(*arg, **kw),
-    "type":              lambda *arg, **kw: type(*arg, **kw),
-    "zip":               lambda *arg, **kw: zip(*arg, **kw),
+    "bytes": lambda *arg, **kw: bytes(*arg, **kw),
+    "bytes.fromhex": lambda *arg, **kw: bytes.fromhex(*arg, **kw),
+    "callable": lambda *arg, **kw: callable(*arg, **kw),
+    "chr": lambda *arg, **kw: chr(*arg, **kw),
+    "complex": lambda *arg, **kw: complex(*arg, **kw),
+    "dict": lambda *arg, **kw: dict(*arg, **kw),
+    "divmod": lambda *arg, **kw: divmod(*arg, **kw),
+    "enumerate": lambda *arg, **kw: enumerate(*arg, **kw),
+    "filter": lambda *arg, **kw: filter(*arg, **kw),
+    "float": lambda *arg, **kw: float(*arg, **kw),
+    "format": lambda *arg, **kw: format(*arg, **kw),
+    "frozenset": lambda *arg, **kw: frozenset(*arg, **kw),
+    "hash": lambda *arg, **kw: hash(*arg, **kw),
+    "hex": lambda *arg, **kw: hex(*arg, **kw),
+    "int": lambda *arg, **kw: int(*arg, **kw),
+    "isinstance": lambda *arg, **kw: isinstance(*arg, **kw),
+    "issubclass": lambda *arg, **kw: issubclass(*arg, **kw),
+    "iter": lambda *arg, **kw: iter(*arg, **kw),
+    "len": lambda *arg, **kw: len(*arg, **kw),
+    "list": lambda *arg, **kw: list(*arg, **kw),
+    "map": lambda *arg, **kw: map(*arg, **kw),
+    "max": lambda *arg, **kw: max(*arg, **kw),
+    "min": lambda *arg, **kw: min(*arg, **kw),
+    "next": lambda *arg, **kw: next(*arg, **kw),
+    "oct": lambda *arg, **kw: oct(*arg, **kw),
+    "ord": lambda *arg, **kw: ord(*arg, **kw),
+    "pow": lambda *arg, **kw: pow(*arg, **kw),
+    "range": lambda *arg, **kw: range(*arg, **kw),
+    "repr": lambda *arg, **kw: repr(*arg, **kw),
+    "reversed": lambda *arg, **kw: reversed(*arg, **kw),
+    "round": lambda *arg, **kw: round(*arg, **kw),
+    "set": lambda *arg, **kw: set(*arg, **kw),
+    "slice": lambda *arg, **kw: slice(*arg, **kw),
+    "sorted": lambda *arg, **kw: sorted(*arg, **kw),
+    "str": lambda *arg, **kw: str(*arg, **kw),
+    "sum": lambda *arg, **kw: sum(*arg, **kw),
+    "tuple": lambda *arg, **kw: tuple(*arg, **kw),
+    "type": lambda *arg, **kw: type(*arg, **kw),
+    "zip": lambda *arg, **kw: zip(*arg, **kw),
 }
 
 
-allowedImports = set([
+allowedImports = {
     "cmath",
     "datetime",
     "decimal",
@@ -81,43 +80,51 @@ allowedImports = set([
     "statistics",
     "string",
     "time",
-])
+}
 
 
 #
 # Objects returned by return, break and continue statements that change execution flow
 #
-class EvalStopFlow():
+class EvalStopFlow:
     """Denotes a statement or action that stops execution flow, eg: return, break etc."""
+
     pass
 
 
 class EvalReturn(EvalStopFlow):
     """Return statement."""
+
     def __init__(self, value):
+        """Initialize return statement value."""
         self.value = value
 
 
 class EvalBreak(EvalStopFlow):
     """Break statement."""
+
     pass
 
 
 class EvalContinue(EvalStopFlow):
     """Continue statement."""
+
     pass
 
 
-class EvalName():
-    """Indentifier that hasn't yet been resolved."""
+class EvalName:
+    """Identifier that hasn't yet been resolved."""
+
     def __init__(self, name):
+        """Initialize identifier to name."""
         self.name = name
 
 
-class EvalFunc():
+class EvalFunc:
     """Class for a callable pyscript function."""
 
     def __init__(self, a):
+        """Initialize a function calling context."""
         self.a = a
         self.name = a.name
         self.defaults = []
@@ -139,10 +146,12 @@ class EvalFunc():
         self.numPosnArg = len(self.a.args.args) - len(self.defaults)
         self.kw_defaults = []
         for v in self.a.args.kw_defaults:
-            self.kw_defaults.append({
-                "ok": True if v else False,
-                "val": None if not v else await astCtx._eval(v)
-            })
+            self.kw_defaults.append(
+                {
+                    "ok": True if v else False,
+                    "val": None if not v else await astCtx._eval(v),
+                }
+            )
 
     async def evalDecorators(self, astCtx):
         """Evaluate the function decorators arguments."""
@@ -185,14 +194,18 @@ class EvalFunc():
             if i < len(args):
                 val = args[i]
                 if varName in kwargs:
-                    raise TypeError("{self.name}() got multiple values for argument '{varName}'")
+                    raise TypeError(
+                        "{self.name}() got multiple values for argument '{varName}'"
+                    )
             elif varName in kwargs:
                 val = kwargs[varName]
                 del kwargs[varName]
             elif self.numPosnArg <= i < len(self.defaults) + self.numPosnArg:
-                val = self.defaults[i-self.numPosnArg]
+                val = self.defaults[i - self.numPosnArg]
             else:
-                raise TypeError(f"{self.name}() missing {self.numPosnArg - i} required positional arguments")
+                raise TypeError(
+                    f"{self.name}() missing {self.numPosnArg - i} required positional arguments"
+                )
             # log(f"eval {self.name}: setting arg {varName} = {val}")
             symTable[varName] = val
         for i in range(len(self.a.args.kwonlyargs)):
@@ -203,7 +216,9 @@ class EvalFunc():
             elif i < len(self.kw_defaults) and self.kw_defaults[i]["ok"]:
                 val = self.kw_defaults[i]["val"]
             else:
-                raise TypeError(f"{self.name}() missing required keyword-only arguments")
+                raise TypeError(
+                    f"{self.name}() missing required keyword-only arguments"
+                )
             # log(f"eval {self.name}: setting arg {varName} = {val}")
             symTable[varName] = val
         if self.a.args.kwarg:
@@ -211,7 +226,7 @@ class EvalFunc():
             symTable[self.a.args.kwarg.arg] = kwargs
         if self.a.args.vararg:
             if len(args) > len(self.a.args.args):
-                symTable[self.a.args.vararg.arg] = tuple(args[len(self.a.args.args):])
+                symTable[self.a.args.vararg.arg] = tuple(args[len(self.a.args.args) :])
             else:
                 symTable[self.a.args.vararg.arg] = ()
             # log(f"eval {self.name}: setting varargs {self.a.args.vararg.arg} = {symTable[self.a.args.vararg.arg]}")
@@ -233,10 +248,11 @@ class EvalFunc():
         return v
 
 
-class AstEval(object):
+class AstEval:
     """Python interpreter AST object evaluator."""
 
     def __init__(self, name, globalSymTable={}):
+        """Initialize a interpreter execution context."""
         self.name = name
         self.globalSymTable = globalSymTable
         self.symTableStack = []
@@ -249,12 +265,12 @@ class AstEval(object):
 
     async def astNotImplemented(self, a, *args):
         """Raise NotImplementedError exception for unimplemented AST types."""
-        astName = 'ast' + a.__class__.__name__
+        astName = "ast" + a.__class__.__name__
         raise NotImplementedError(f"{self.name}: not implemented ast " + astName)
 
     async def _eval(self, a, undefinedCheck=True):
-        """Internal evaluator calls specific function based on class type."""
-        astName = 'ast' + a.__class__.__name__
+        """Vector to specific function based on ast class type."""
+        astName = "ast" + a.__class__.__name__
         try:
             func = getattr(self, astName, self.astNotImplemented)
             if asyncio.iscoroutinefunction(func):
@@ -269,7 +285,11 @@ class AstEval(object):
         except Exception as err:
             funcName = self.currFunc.getName() + "(), " if self.currFunc else ""
             self.exception = f"{err} in {funcName}{self.filename} line {a.lineno} column {a.col_offset}"
-            _LOGGER.error(f"{err} in {funcName}{self.filename} line {a.lineno} column {a.col_offset}" + " " + traceback.format_exc(-1))
+            _LOGGER.error(
+                f"{err} in {funcName}{self.filename} line {a.lineno} column {a.col_offset}"
+                + " "
+                + traceback.format_exc(-1)
+            )
         return None
 
     # Statements return NONE, EvalBreak, EvalContinue, EvalReturn
@@ -302,7 +322,9 @@ class AstEval(object):
         else:
             mod = sys.modules[a.module]
         for imp in a.names:
-            self.symTable[imp.name if imp.asname is None else imp.asname] = getattr(mod, imp.name)
+            self.symTable[imp.name if imp.asname is None else imp.asname] = getattr(
+                mod, imp.name
+            )
 
     async def astIf(self, a):
         """Execute if statement."""
@@ -408,8 +430,12 @@ class AstEval(object):
                     ind = await self._eval(lhs.slice.value)
                     var[ind] = val
                 elif isinstance(lhs.slice, ast.Slice):
-                    lower = await self._eval(lhs.slice.lower) if lhs.slice.lower else None
-                    upper = await self._eval(lhs.slice.upper) if lhs.slice.upper else None
+                    lower = (
+                        await self._eval(lhs.slice.lower) if lhs.slice.lower else None
+                    )
+                    upper = (
+                        await self._eval(lhs.slice.upper) if lhs.slice.upper else None
+                    )
                     step = await self._eval(lhs.slice.step) if lhs.slice.step else None
                     if not lower and not upper and not step:
                         return val
@@ -431,7 +457,7 @@ class AstEval(object):
                 # log(f"doing eval for assign {ast.dump(lhs)}")
                 varName = await self._eval(lhs)
                 if varName.find(".") >= 0:
-                    state.set(varName,val)
+                    state.set(varName, val)
                 else:
                     if self.currFunc and varName in self.currFunc.globalNames:
                         self.globalSymTable[varName] = val
@@ -441,14 +467,18 @@ class AstEval(object):
                                 symTable[varName] = val
                                 break
                         else:
-                            raise TypeError("can't find nonlocal '{varName}' for assignment")
+                            raise TypeError(
+                                "can't find nonlocal '{varName}' for assignment"
+                            )
                     else:
                         self.symTable[varName] = val
 
     async def astAugAssign(self, a):
-        """Execute augmented assignment statement (eg, lhs += value)"""
+        """Execute augmented assignment statement (lhs <BinOp>= value)."""
         varName = await self._eval(a.target)
-        val = await self._eval(ast.BinOp(left=ast.Name(id=varName, ctx=ast.Load()), op=a.op, right=a.value))
+        val = await self._eval(
+            ast.BinOp(left=ast.Name(id=varName, ctx=ast.Load()), op=a.op, right=a.value)
+        )
         if self.currFunc and varName in self.currFunc.globalNames:
             self.globalSymTable[varName] = val
         elif self.currFunc and varName in self.currFunc.nonlocalNames:
@@ -471,7 +501,9 @@ class AstEval(object):
                     for e in ind if isinstance(ind, list) else [ind]:
                         del var[e]
                 else:
-                    raise NotImplementedError(f"{self.name}: not implemented slice type {t.slice} in del")
+                    raise NotImplementedError(
+                        f"{self.name}: not implemented slice type {t.slice} in del"
+                    )
             elif isinstance(t, ast.Name):
                 if self.currFunc and t.id in self.currFunc.globalNames:
                     if t.id in self.globalSymTable:
@@ -512,7 +544,9 @@ class AstEval(object):
             val = await self._eval(a.value, undefinedCheck=False)
             if isinstance(val, EvalName):
                 # logc(logLevel >= 1, f"eval {self.name}: calling astName on {val.name}.{a.attr}")
-                return await self.astName(ast.Name(id=f"{val.name}.{a.attr}", ctx=a.ctx))
+                return await self.astName(
+                    ast.Name(id=f"{val.name}.{a.attr}", ctx=a.ctx)
+                )
             return getattr(val, a.attr, None)
         if isinstance(val, EvalName):
             s = fullName.rsplit(".", 1)
@@ -522,7 +556,7 @@ class AstEval(object):
         return val
 
     async def astName(self, a):
-        """Identifier looks up value on load, or returns name on set."""
+        """Look up value of identifier on load, or returns name on set."""
         if isinstance(a.ctx, ast.Load):
             #
             # check other scopes if required by global or nonlocal declarations
@@ -564,67 +598,83 @@ class AstEval(object):
 
     async def astBinOp(self, a):
         """Evaluate binary operators by calling function based on class."""
-        astName = 'astBinOp' + a.op.__class__.__name__
+        astName = "astBinOp" + a.op.__class__.__name__
         return await getattr(self, astName, self.astNotImplemented)(a.left, a.right)
 
     async def astBinOpAdd(self, a, b):
+        """Evaluate binary operator: +."""
         return (await self._eval(a)) + (await self._eval(b))
 
     async def astBinOpSub(self, a, b):
+        """Evaluate binary operator: -."""
         return (await self._eval(a)) - (await self._eval(b))
 
     async def astBinOpMult(self, a, b):
+        """Evaluate binary operator: *."""
         return (await self._eval(a)) * (await self._eval(b))
 
     async def astBinOpDiv(self, a, b):
+        """Evaluate binary operator: /."""
         return (await self._eval(a)) / (await self._eval(b))
 
     async def astBinOpMod(self, a, b):
+        """Evaluate binary operator: %."""
         return (await self._eval(a)) % (await self._eval(b))
 
     async def astBinOpPow(self, a, b):
+        """Evaluate binary operator: **."""
         return (await self._eval(a)) ** (await self._eval(b))
 
     async def astBinOpLShift(self, a, b):
+        """Evaluate binary operator: <<."""
         return (await self._eval(a)) << (await self._eval(b))
 
     async def astBinOpRShift(self, a, b):
+        """Evaluate binary operator: >>."""
         return (await self._eval(a)) >> (await self._eval(b))
 
     async def astBinOpBitOr(self, a, b):
+        """Evaluate binary operator: |."""
         return (await self._eval(a)) | (await self._eval(b))
 
     async def astBinOpBitXor(self, a, b):
+        """Evaluate binary operator: ^."""
         return (await self._eval(a)) ^ (await self._eval(b))
 
     async def astBinOpBitAnd(self, a, b):
+        """Evaluate binary operator: &."""
         return (await self._eval(a)) & (await self._eval(b))
 
     async def astBinOpFloorDiv(self, a, b):
+        """Evaluate binary operator: //."""
         return (await self._eval(a)) // (await self._eval(b))
 
     async def astUnaryOp(self, a):
         """Evaluate unary operators by calling function based on class."""
-        astName = 'astUnaryOp' + a.op.__class__.__name__
+        astName = "astUnaryOp" + a.op.__class__.__name__
         return await getattr(self, astName, self.astNotImplemented)(a.operand)
 
     async def astUnaryOpNot(self, a):
+        """Evaluate unary operator: not."""
         return not (await self._eval(a))
 
     async def astUnaryOpInvert(self, a):
+        """Evaluate unary operator: ~."""
         return ~(await self._eval(a))
 
     async def astUnaryOpUAdd(self, a):
-        return (await self._eval(a))
+        """Evaluate unary operator: +."""
+        return await self._eval(a)
 
     async def astUnaryOpUSub(self, a):
+        """Evaluate unary operator: -."""
         return -(await self._eval(a))
 
     async def astCompare(self, a):
         """Evaluate comparison operators by calling function based on class."""
         left = a.left
         for op, right in zip(a.ops, a.comparators):
-            astName = 'astCmpOp' + op.__class__.__name__
+            astName = "astCmpOp" + op.__class__.__name__
             val = await getattr(self, astName, self.astNotImplemented)(left, right)
             if not val:
                 return False
@@ -632,33 +682,43 @@ class AstEval(object):
         return True
 
     async def astCmpOpEq(self, a, b):
+        """Evaluate comparison operator: ==."""
         return (await self._eval(a)) == (await self._eval(b))
 
     async def astCmpOpNotEq(self, a, b):
+        """Evaluate comparison operator: !=."""
         return (await self._eval(a)) != (await self._eval(b))
 
     async def astCmpOpLt(self, a, b):
+        """Evaluate comparison operator: <."""
         return (await self._eval(a)) < (await self._eval(b))
 
     async def astCmpOpLtE(self, a, b):
+        """Evaluate comparison operator: <=."""
         return (await self._eval(a)) <= (await self._eval(b))
 
     async def astCmpOpGt(self, a, b):
+        """Evaluate comparison operator: >."""
         return (await self._eval(a)) > (await self._eval(b))
 
     async def astCmpOpGtE(self, a, b):
+        """Evaluate comparison operator: >=."""
         return (await self._eval(a)) >= (await self._eval(b))
 
     async def astCmpOpIs(self, a, b):
+        """Evaluate comparison operator: is."""
         return (await self._eval(a)) is (await self._eval(b))
 
     async def astCmpOpIsNot(self, a, b):
+        """Evaluate comparison operator: is not."""
         return (await self._eval(a)) is not (await self._eval(b))
 
     async def astCmpOpIn(self, a, b):
+        """Evaluate comparison operator: in."""
         return (await self._eval(a)) in (await self._eval(b))
 
     async def astCmpOpNotIn(self, a, b):
+        """Evaluate comparison operator: not in."""
         return (await self._eval(a)) not in (await self._eval(b))
 
     async def astBoolOp(self, a):
@@ -749,7 +809,9 @@ class AstEval(object):
             kwargs[kw.arg] = await self._eval(kw.value)
         for arg in a.args:
             args.append(await self._eval(arg))
-        argStr = ', '.join(['"'+e+'"' if isinstance(e, str) else str(e) for e in args])
+        argStr = ", ".join(
+            ['"' + e + '"' if isinstance(e, str) else str(e) for e in args]
+        )
 
         if isinstance(func, EvalFunc):
             # logc(logLevel >= 3, f"eval {self.name}: calling {func.getName()}({argStr})")
@@ -783,7 +845,11 @@ class AstEval(object):
 
     async def astIfExp(self, a):
         """Evaluate if expression."""
-        return await self._eval(a.body) if (await self._eval(a.test)) else await self._eval(a.orelse)
+        return (
+            await self._eval(a.body)
+            if (await self._eval(a.test))
+            else await self._eval(a.orelse)
+        )
 
     async def astNum(self, a):
         """Evaluate number."""
@@ -795,6 +861,10 @@ class AstEval(object):
 
     async def astNameConstant(self, a):
         """Evaluate name constant."""
+        return a.value
+
+    async def astConstant(self, a):
+        """Evaluate constant."""
         return a.value
 
     async def astJoinedStr(self, a):
@@ -851,7 +921,7 @@ class AstEval(object):
         except Exception as err:
             self.exception = f"parsing error {err}"
             self.exceptionLong = traceback.print_exc(-1)
-            _LOGGER.error(f"parsing error:" + traceback.format_exc(-1))
+            _LOGGER.error("parsing error:" + traceback.format_exc(-1))
             return False
 
     def getException(self):
@@ -867,7 +937,7 @@ class AstEval(object):
         self.localSymTable = symTable
 
     async def eval(self, newStateVars={}):
-        """Main entry point to execute code, with the optional state variables added to the scope."""
+        """Execute parsed code, with the optional state variables added to the scope."""
         self.exception = None
         self.exceptionLong = None
         self.localSymTable.update(newStateVars)

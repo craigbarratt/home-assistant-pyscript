@@ -4,7 +4,6 @@ import asyncio
 import logging
 import traceback
 
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -51,7 +50,7 @@ def service_has_service(domain, name):
 async def service_call(domain, name, **kwargs):
     """Implement service.call()."""
     await hass.services.async_call(domain, name, **kwargs)
-    
+
 
 #
 # We create loggers for each top-level function that include
@@ -100,7 +99,7 @@ def getLoggerWarning(astCtx, *arg, **kw):
 
 functions = {
     "event.fire": event_fire,
-    "task.sleep":  async_sleep,
+    "task.sleep": async_sleep,
     "task.unique": task_unique,
     "service.call": service_call,
     "service.has_service": service_has_service,
@@ -113,10 +112,10 @@ functions = {
 # ast context
 #
 astFunctions = {
-    "log.debug":     getLoggerDebug,
-    "log.error":     getLoggerError,
-    "log.info":      getLoggerInfo,
-    "log.warning":   getLoggerWarning,
+    "log.debug": getLoggerDebug,
+    "log.error": getLoggerError,
+    "log.info": getLoggerInfo,
+    "log.warning": getLoggerWarning,
 }
 
 
@@ -166,7 +165,7 @@ def installAstFuncs(astCtx):
     for name, func in astFunctions.items():
         symTable[name] = func(astCtx)
     astCtx.setLocalSymTable(symTable)
- 
+
 
 def get(name):
     """Lookup a function locally and then as a service."""
@@ -198,7 +197,7 @@ def current_task():
 
 
 async def runCoro(coro):
-    """Wrapper to run coroutine task, updating Unique task on start and exit."""
+    """Run coroutine task and update Unique task on start and exit."""
     global UniqueTask2Name, UniqueName2Task
     try:
         await coro
