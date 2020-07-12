@@ -748,6 +748,15 @@ class AstEval:
                 val.append(v)
             return val
 
+    async def astTuple(self, a):
+        """Evaluate Tuple."""
+        if isinstance(a.ctx, ast.Load):
+            val = []
+            for arg in a.elts:
+                v = await self._eval(arg)
+                val.append(v)
+            return tuple(val)
+
     async def astDict(self, a):
         """Evaluate dict."""
         d = {}
