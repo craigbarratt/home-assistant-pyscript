@@ -1,21 +1,18 @@
 """Test the pyscript component."""
+from ast import literal_eval
 import asyncio
-import logging
-import time
 from datetime import datetime as dt
+import time
 
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_STATE_CHANGED
-from homeassistant.components.pyscript import DOMAIN
-from homeassistant.helpers.service import async_get_all_descriptions
-from homeassistant.setup import async_setup_component
 import homeassistant.components.pyscript.trigger as trigger
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_STATE_CHANGED
+from homeassistant.setup import async_setup_component
 
 from tests.async_mock import mock_open, patch
-from tests.common import patch_yaml_files
 
 
 async def setup_script(hass, notifyQ, now, source):
-    """Setup with the given pyscript."""
+    """Initialize and load the given pyscript."""
     scripts = [
         "/some/config/dir/pyscripts/hello.py",
     ]
@@ -24,7 +21,9 @@ async def setup_script(hass, notifyQ, now, source):
     ), patch(
         "homeassistant.components.pyscript.glob.iglob", return_value=scripts
     ), patch(
-        "homeassistant.components.pyscript.open", mock_open(read_data=source), create=True,
+        "homeassistant.components.pyscript.open",
+        mock_open(read_data=source),
+        create=True,
     ), patch(
         "homeassistant.components.pyscript.trigger.dt_now", return_value=now
     ):
@@ -37,6 +36,7 @@ async def setup_script(hass, notifyQ, now, source):
     trigger.__dict__["dt_now"] = lambda: now
 
     if notifyQ:
+
         async def state_changed(event):
             varName = event.data["entity_id"]
             if varName != "pyscript.done":
@@ -46,14 +46,20 @@ async def setup_script(hass, notifyQ, now, source):
 
         hass.bus.async_listen(EVENT_STATE_CHANGED, state_changed)
 
+
 async def wait_until_done(notifyQ):
+    """Wait for the done handshake."""
     return await asyncio.wait_for(notifyQ.get(), timeout=4)
 
 
 async def test_state_trigger(hass, caplog):
     """Test state trigger."""
     notifyQ = asyncio.Queue(0)
-    await setup_script(hass, notifyQ, dt(2020, 7, 1, 11, 59, 59, 999999), """ 
+    await setup_script(
+        hass,
+        notifyQ,
+        dt(2020, 7, 1, 11, 59, 59, 999999),
+        """
 
 from math import sqrt
 
@@ -152,41 +158,57 @@ def func4(trigger_type=None, event_type=None, **kwargs):
     pyscript.done = [seqNum, res]
 
 
-""")
+""",
+    )
     seqNum = 0
 
     seqNum += 1
     # fire event to startup triggers, and handshake when they are running
     hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
-    assert eval(await wait_until_done(notifyQ)) == seqNum
+    assert literal_eval(await wait_until_done(notifyQ)) == seqNum
 
     seqNum += 1
     # initialize the trigger and active variables
-    hass.states.async_set('pyscript.f1var1', 0)
-    hass.states.async_set('pyscript.f2var2', 0)
-    hass.states.async_set('pyscript.f2var3', 0)
-    hass.states.async_set('pyscript.f2var4', 0)
+    hass.states.async_set("pyscript.f1var1", 0)
+    hass.states.async_set("pyscript.f2var2", 0)
+    hass.states.async_set("pyscript.f2var3", 0)
+    hass.states.async_set("pyscript.f2var4", 0)
 
     # try some values that shouldn't work, then one that does
-    hass.states.async_set('pyscript.f1var1', 0)
-    hass.states.async_set('pyscript.f1var1', "string")
-    hass.states.async_set('pyscript.f1var1', -1)
-    hass.states.async_set('pyscript.f1var1', 1)
-    assert eval(await wait_until_done(notifyQ)) == [seqNum, "pyscript.f1var1", 1, 32]
+    hass.states.async_set("pyscript.f1var1", 0)
+    hass.states.async_set("pyscript.f1var1", "string")
+    hass.states.async_set("pyscript.f1var1", -1)
+    hass.states.async_set("pyscript.f1var1", 1)
+    assert literal_eval(await wait_until_done(notifyQ)) == [
+        seqNum,
+        "pyscript.f1var1",
+        1,
+        32,
+    ]
     assert "func1 var = pyscript.f1var1, value = 1" in caplog.text
 
     seqNum += 1
-    hass.states.async_set('pyscript.f2var3', 3)
-    hass.states.async_set('pyscript.f2var4', 0)
-    hass.states.async_set('pyscript.f2var2', 0)
-    hass.states.async_set('pyscript.f1var1', 0)
-    hass.states.async_set('pyscript.f1var1', 1)
-    assert eval(await wait_until_done(notifyQ)) == [seqNum, "pyscript.f1var1", 1, 32]
+    hass.states.async_set("pyscript.f2var3", 3)
+    hass.states.async_set("pyscript.f2var4", 0)
+    hass.states.async_set("pyscript.f2var2", 0)
+    hass.states.async_set("pyscript.f1var1", 0)
+    hass.states.async_set("pyscript.f1var1", 1)
+    assert literal_eval(await wait_until_done(notifyQ)) == [
+        seqNum,
+        "pyscript.f1var1",
+        1,
+        32,
+    ]
 
     seqNum += 1
-    hass.states.async_set('pyscript.f2var4', 4)
-    hass.states.async_set('pyscript.f2var2', 2)
-    assert eval(await wait_until_done(notifyQ)) == [seqNum, "pyscript.f2var2", 2, 64]
+    hass.states.async_set("pyscript.f2var4", 4)
+    hass.states.async_set("pyscript.f2var2", 2)
+    assert literal_eval(await wait_until_done(notifyQ)) == [
+        seqNum,
+        "pyscript.f2var2",
+        2,
+        64,
+    ]
     assert "func2 var = pyscript.f2var2, value = 2" in caplog.text
 
     seqNum += 1
@@ -194,10 +216,15 @@ def func4(trigger_type=None, event_type=None, **kwargs):
     hass.bus.async_fire("test_event3", {"arg1": 20, "arg2": 29})
     hass.bus.async_fire("test_event3", {"arg1": 12, "arg2": 30})
     hass.bus.async_fire("test_event3", {"arg1": 20, "arg2": 30})
-    assert eval(await wait_until_done(notifyQ)) == [seqNum, "event", "test_event3", {"arg1": 20, "arg2": 30}]
+    assert literal_eval(await wait_until_done(notifyQ)) == [
+        seqNum,
+        "event",
+        "test_event3",
+        {"arg1": 20, "arg2": 30},
+    ]
 
     seqNum += 1
-    hass.states.async_set('pyscript.f4var2', 2)
+    hass.states.async_set("pyscript.f4var2", 2)
     hass.bus.async_fire("test_event4", {"arg1": 20, "arg2": 30})
     t = time.monotonic()
     while notifyQ.empty() and t < time.monotonic() + 4:
@@ -209,35 +236,45 @@ def func4(trigger_type=None, event_type=None, **kwargs):
         "trigger_type": "event",
         "event_type": "test_event4b",
         "arg1": 25,
-        "arg2": 35
+        "arg2": 35,
     }
-    assert eval(await wait_until_done(notifyQ)) == [seqNum, trig, "test_event4", {"arg1": 20, "arg2": 30}]
+    assert literal_eval(await wait_until_done(notifyQ)) == [
+        seqNum,
+        trig,
+        "test_event4",
+        {"arg1": 20, "arg2": 30},
+    ]
 
     seqNum += 1
     # the state_trigger wait_until should succeed immediately, since the expr is true
-    assert eval(await wait_until_done(notifyQ)) == [seqNum, {"trigger_type": "state"}]
+    assert literal_eval(await wait_until_done(notifyQ)) == [
+        seqNum,
+        {"trigger_type": "state"},
+    ]
 
     seqNum += 1
     # now try a few other values, then the correct one
-    hass.states.async_set('pyscript.f4var2', 4)
-    hass.states.async_set('pyscript.f4var2', 2)
-    hass.states.async_set('pyscript.f4var2', 10)
+    hass.states.async_set("pyscript.f4var2", 4)
+    hass.states.async_set("pyscript.f4var2", 2)
+    hass.states.async_set("pyscript.f4var2", 10)
     trig = {
         "trigger_type": "state",
         "var_name": "pyscript.f4var2",
         "value": "10",
         "old_value": "2",
     }
-    r = eval(await wait_until_done(notifyQ))
+    r = literal_eval(await wait_until_done(notifyQ))
     assert r[0] == seqNum
     assert r[1] == trig
 
     assert hass.states.get("pyscript.setVar1").state == "2"
     assert hass.states.get("pyscript.setVar2").state == "var2"
-    assert eval(hass.states.get("pyscript.setVar3").state) == {"foo": "bar"}
+    assert literal_eval(hass.states.get("pyscript.setVar3").state) == {"foo": "bar"}
 
     for i in range(4):
         # the four time triggers should happen almost immediately
         seqNum += 1
-        assert eval(await wait_until_done(notifyQ)) == [seqNum, {"trigger_type": "time"}]
-
+        assert literal_eval(await wait_until_done(notifyQ)) == [
+            seqNum,
+            {"trigger_type": "time"},
+        ]
