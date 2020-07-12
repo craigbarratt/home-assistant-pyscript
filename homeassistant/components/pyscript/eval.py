@@ -739,36 +739,44 @@ class AstEval:
                     return v
             return 0
 
+    async def evalEltList(self, elts):
+        """Evaluate and star list elements."""
+        val = []
+        for arg in elts:
+            if isinstance(arg, ast.Starred):
+                for v in await self._eval(arg.value):
+                    val.append(v)
+            else:
+                v = await self._eval(arg)
+                val.append(v)
+        return val
+
     async def astList(self, a):
         """Evaluate list."""
         if isinstance(a.ctx, ast.Load):
-            val = []
-            for arg in a.elts:
-                v = await self._eval(arg)
-                val.append(v)
-            return val
+            return await self.evalEltList(a.elts)
 
     async def astTuple(self, a):
         """Evaluate Tuple."""
         if isinstance(a.ctx, ast.Load):
-            val = []
-            for arg in a.elts:
-                v = await self._eval(arg)
-                val.append(v)
-            return tuple(val)
+            return tuple(await self.evalEltList(a.elts))
 
     async def astDict(self, a):
         """Evaluate dict."""
         d = {}
         for keyAst, valAst in zip(a.keys, a.values):
-            d[await self._eval(keyAst)] = await self._eval(valAst)
+            val = await self._eval(valAst)
+            if keyAst is None:
+                d.update(val)
+            else:
+                d[await self._eval(keyAst)] = val
         return d
 
     async def astSet(self, a):
         """Evaluate set."""
         s = set()
-        for elt in a.elts:
-            s.add(await self._eval(elt))
+        for elt in await self.evalEltList(a.elts):
+            s.add(elt)
         return s
 
     async def astSubscript(self, a):
@@ -812,12 +820,13 @@ class AstEval:
     async def astCall(self, a):
         """Evaluate function call."""
         func = await self._eval(a.func)
-        args = []
         kwargs = {}
         for kw in a.keywords:
-            kwargs[kw.arg] = await self._eval(kw.value)
-        for arg in a.args:
-            args.append(await self._eval(arg))
+            if kw.arg is None:
+                kwargs.update(await self._eval(kw.value))
+            else:
+                kwargs[kw.arg] = await self._eval(kw.value)
+        args = await self.evalEltList(a.args)
         argStr = ", ".join(
             ['"' + e + '"' if isinstance(e, str) else str(e) for e in args]
         )
@@ -922,15 +931,15 @@ class AstEval:
             return True
         except SyntaxError as err:
             self.exception = f"syntax error {err}"
-            self.exceptionLong = traceback.print_exc(-1)
+            self.exceptionLong = traceback.print_exc(0)
             _LOGGER.error(f"syntax error: {err}")
             return False
         except asyncio.CancelledError:
             raise
         except Exception as err:
             self.exception = f"parsing error {err}"
-            self.exceptionLong = traceback.print_exc(-1)
-            _LOGGER.error("parsing error:" + traceback.format_exc(-1))
+            self.exceptionLong = traceback.print_exc(0)
+            _LOGGER.error("parsing error:" + traceback.format_exc(0))
             return False
 
     def getException(self):
