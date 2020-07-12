@@ -15,9 +15,9 @@ async def async_sleep(duration):
     await asyncio.sleep(float(duration))
 
 
-async def event_fire(eventType, eventData={}):
+async def event_fire(eventType, **kwargs):
     """Implement event.fire()."""
-    hass.bus.async_fire(eventType, eventData)
+    hass.bus.async_fire(eventType, kwargs)
 
 
 UniqueTask2Name = {}
@@ -49,7 +49,7 @@ def service_has_service(domain, name):
 
 async def service_call(domain, name, **kwargs):
     """Implement service.call()."""
-    await hass.services.async_call(domain, name, **kwargs)
+    await hass.services.async_call(domain, name, kwargs)
 
 
 #
