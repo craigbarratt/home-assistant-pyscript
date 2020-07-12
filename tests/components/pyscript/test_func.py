@@ -90,6 +90,10 @@ def func2(var_name=None, value=None):
     log.info(f"func2 var = {var_name}, value = {value}")
     pyscript.done = [seqNum, var_name, int(value), sqrt(4096)]
 
+@event_trigger("fire_event")
+def fire_event(**kwargs):
+    event.fire(kwargs["new_event"], arg1=kwargs["arg1"], arg2=kwargs["arg2"])
+
 @event_trigger("test_event3", "arg1 == 20 and arg2 == 30")
 def func3(trigger_type=None, event_type=None, **kwargs):
     global seqNum
@@ -215,7 +219,9 @@ def func4(trigger_type=None, event_type=None, **kwargs):
     hass.bus.async_fire("test_event3", {"arg1": 12, "arg2": 34})
     hass.bus.async_fire("test_event3", {"arg1": 20, "arg2": 29})
     hass.bus.async_fire("test_event3", {"arg1": 12, "arg2": 30})
-    hass.bus.async_fire("test_event3", {"arg1": 20, "arg2": 30})
+    hass.bus.async_fire(
+        "fire_event", {"new_event": "test_event3", "arg1": 20, "arg2": 30}
+    )
     assert literal_eval(await wait_until_done(notifyQ)) == [
         seqNum,
         "event",

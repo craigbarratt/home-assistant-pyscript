@@ -160,7 +160,13 @@ def func2(**kwargs):
     x = 1
     x = 2 * x + 3
     log.info(f"this is func1 x = {x}, kwargs = {kwargs}")
-    pyscript.done = [x, kwargs]
+    has2 = service.has_service("pyscript", "func2")
+    has3 = service.has_service("pyscript", "func3")
+    pyscript.done = [x, kwargs, has2, has3]
+
+@service
+def call_service(domain=None, name=None, **kwargs):
+    service.call(domain, name, **kwargs)
 
 """,
     )
@@ -169,7 +175,11 @@ def func2(**kwargs):
     assert literal_eval(v) == [5, 1, 2]
     assert "this is func1 x = 5" in caplog.text
 
-    await hass.services.async_call("pyscript", "func1", {"arg1": "string1"})
+    await hass.services.async_call(
+        "pyscript",
+        "call_service",
+        {"domain": "pyscript", "name": "func1", "arg1": "string1"},
+    )
     v = await wait_until_done(notifyQ)
     assert literal_eval(v) == [5, "string1", 2]
 
@@ -179,16 +189,22 @@ def func2(**kwargs):
     v = await wait_until_done(notifyQ)
     assert literal_eval(v) == [5, "string1", 123]
 
-    await hass.services.async_call("pyscript", "func2", {})
+    await hass.services.async_call(
+        "pyscript", "call_service", {"domain": "pyscript", "name": "func2"}
+    )
     v = await wait_until_done(notifyQ)
-    assert literal_eval(v) == [5, {}]
+    assert literal_eval(v) == [5, {}, 1, 0]
 
-    await hass.services.async_call("pyscript", "func2", {"arg1": "string1"})
+    await hass.services.async_call(
+        "pyscript",
+        "call_service",
+        {"domain": "pyscript", "name": "func2", "arg1": "string1"},
+    )
     v = await wait_until_done(notifyQ)
-    assert literal_eval(v) == [5, {"arg1": "string1"}]
+    assert literal_eval(v) == [5, {"arg1": "string1"}, 1, 0]
 
     await hass.services.async_call(
         "pyscript", "func2", {"arg1": "string1", "arg2": 123}
     )
     v = await wait_until_done(notifyQ)
-    assert literal_eval(v) == [5, {"arg1": "string1", "arg2": 123}]
+    assert literal_eval(v) == [5, {"arg1": "string1", "arg2": 123}, 1, 0]
