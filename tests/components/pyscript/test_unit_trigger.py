@@ -1,6 +1,7 @@
 """Unit tests for time trigger functions."""
 from datetime import datetime as dt
 
+import homeassistant.components.pyscript.handler as handler
 import homeassistant.components.pyscript.trigger as trigger
 
 from tests.async_mock import patch
@@ -46,18 +47,19 @@ parseDateTimeTests = [
 ]
 
 
-async def test_ParseDateTime(hass):
+async def test_parse_date_time(hass):
     """Run time parse datetime tests."""
     #
-    # TODO: can't get sunrise/sunset to provide reasonable values for
-    # an artificial date and location
+    # Unable to get sunrise/sunset to provide reasonable values for
+    # an artificial date and location, so can't test sunrise/sunset.
     #
     hass.config.latitude = 54
     hass.config.longitude = 0
     hass.config.elevation = 0
     hass.config.time_zone = "GMT"
 
-    trigger.hassSet(hass)
+    handler_func = handler.Handler(hass)
+    trig = trigger.TrigTime(hass, handler_func)
 
     now = dt(2019, 9, 1, 13, 0, 0, 0)
 
@@ -65,9 +67,9 @@ async def test_ParseDateTime(hass):
         "homeassistant.helpers.condition.dt_util.utcnow", return_value=now
     ), patch("homeassistant.util.dt.utcnow", return_value=now):
         # await async_setup_component(hass, "pyscript", {})
-        for t in parseDateTimeTests:
-            spec, dateOffset, expect = t
-            out = trigger.parseDateTime(spec, dateOffset, now)
+        for test_data in parseDateTimeTests:
+            spec, date_offset, expect = test_data
+            out = trig.parse_date_time(spec, date_offset, now)
             assert out == expect
 
 
@@ -100,15 +102,16 @@ timerActiveCheckTests = [
 ]
 
 
-def test_TimerActiveCheck(hass):
+def test_timer_active_check(hass):
     """Run time active check tests."""
-    trigger.hassSet(hass)
-    for t in timerActiveCheckTests:
-        spec, now, expect = t
-        out = trigger.TimerActiveCheck(spec, now)
+    handler_func = handler.Handler(hass)
+    trig = trigger.TrigTime(hass, handler_func)
+    for test_data in timerActiveCheckTests:
+        spec, now, expect = test_data
+        out = trig.timer_active_check(spec, now)
         if out != expect:
             print(
-                f"trigger.TimerActiveCheck({spec}, {now}) -> {out} vs expect {expect}"
+                f"trigger.timer_active_check({spec}, {now}) -> {out} vs expect {expect}"
             )
         assert out == expect
 
@@ -213,16 +216,17 @@ timerTriggerNextTests = [
 ]
 
 
-def test_TimerTriggerNext(hass):
+def test_timer_trigger_next(hass):
     """Run trigger next tests."""
-    trigger.hassSet(hass)
-    for t in timerTriggerNextTests:
+    handler_func = handler.Handler(hass)
+    trig = trigger.TrigTime(hass, handler_func)
+    for test_data in timerTriggerNextTests:
         now = dt(2019, 9, 1, 13, 0, 0, 100000)
-        spec, expectSeq = t
-        for expect in expectSeq:
-            next = trigger.TimerTriggerNext(spec, now)
-            assert next == expect
-            now = next
+        spec, expect_seq = test_data
+        for expect in expect_seq:
+            t_next = trig.timer_trigger_next(spec, now)
+            assert t_next == expect
+            now = t_next
 
 
 timerTriggerNextTestsMonthRollover = [
@@ -260,13 +264,14 @@ timerTriggerNextTestsMonthRollover = [
 ]
 
 
-def test_TimerTriggerNextMonthRollover(hass):
+def test_timer_trigger_next_month_rollover(hass):
     """Run month rollover tests."""
-    trigger.hassSet(hass)
-    for t in timerTriggerNextTestsMonthRollover:
+    handler_func = handler.Handler(hass)
+    trig = trigger.TrigTime(hass, handler_func)
+    for test_data in timerTriggerNextTestsMonthRollover:
         now = dt(2020, 6, 30, 13, 0, 0, 100000)
-        spec, expectSeq = t
-        for expect in expectSeq:
-            next = trigger.TimerTriggerNext(spec, now)
-            assert next == expect
-            now = next
+        spec, expect_seq = test_data
+        for expect in expect_seq:
+            t_next = trig.timer_trigger_next(spec, now)
+            assert t_next == expect
+            now = t_next

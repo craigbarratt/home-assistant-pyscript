@@ -7,185 +7,6 @@ import traceback
 _LOGGER = logging.getLogger(__name__)
 
 
-hass = None
-
-
-async def async_sleep(duration):
-    """Implement task.sleep()."""
-    await asyncio.sleep(float(duration))
-
-
-async def event_fire(eventType, **kwargs):
-    """Implement event.fire()."""
-    hass.bus.async_fire(eventType, kwargs)
-
-
-UniqueTask2Name = {}
-UniqueName2Task = {}
-
-
-async def task_unique(name, kill_me=False):
-    """Implement task.unique()."""
-    global UniqueTask2Name, UniqueName2Task
-    task = current_task()
-    if name in UniqueName2Task:
-        if not kill_me:
-            task = UniqueName2Task[name]
-        try:
-            task.cancel()
-            await task
-        except asyncio.CancelledError:
-            pass
-        UniqueTask2Name.pop(UniqueName2Task[name], None)
-        UniqueName2Task.pop(name, None)
-    UniqueName2Task[name] = task
-    UniqueName2Task[task] = name
-
-
-def service_has_service(domain, name):
-    """Implement service.has_service()."""
-    return hass.services.has_service(domain, name)
-
-
-async def service_call(domain, name, **kwargs):
-    """Implement service.call()."""
-    await hass.services.async_call(domain, name, kwargs)
-
-
-#
-# We create loggers for each top-level function that include
-# that function's name.  We cache them here so we only create
-# one for each function
-#
-Loggers = {}
-
-
-def getLogger(astCtx, type, *arg, **kw):
-    """Return a logger function tied to the execution context of a function."""
-    global Loggers
-
-    if astCtx.name not in Loggers:
-        #
-        # Maintain a cache for efficiency.  Remove last name (handlers)
-        # and replace with "func.{name}".
-        #
-        name = __name__
-        i = name.rfind(".")
-        if i >= 0:
-            name = f"{name[0:i]}.func.{astCtx.name}"
-        Loggers[astCtx.name] = logging.getLogger(name)
-    return getattr(Loggers[astCtx.name], type)
-
-
-def getLoggerDebug(astCtx, *arg, **kw):
-    """Implement log.debug()."""
-    return getLogger(astCtx, "debug", *arg, **kw)
-
-
-def getLoggerError(astCtx, *arg, **kw):
-    """Implement log.error()."""
-    return getLogger(astCtx, "error", *arg, **kw)
-
-
-def getLoggerInfo(astCtx, *arg, **kw):
-    """Implement log.info()."""
-    return getLogger(astCtx, "info", *arg, **kw)
-
-
-def getLoggerWarning(astCtx, *arg, **kw):
-    """Implement log.warning()."""
-    return getLogger(astCtx, "warning", *arg, **kw)
-
-
-functions = {
-    "event.fire": event_fire,
-    "task.sleep": async_sleep,
-    "task.unique": task_unique,
-    "service.call": service_call,
-    "service.has_service": service_has_service,
-}
-
-
-#
-# Functions that take the AstEval context as a first argument,
-# which is needed by a handful of special functions that need the
-# ast context
-#
-astFunctions = {
-    "log.debug": getLoggerDebug,
-    "log.error": getLoggerError,
-    "log.info": getLoggerInfo,
-    "log.warning": getLoggerWarning,
-}
-
-
-def hassSet(h):
-    """Initialize hass handle."""
-    global hass
-    hass = h
-
-
-def register(funcs):
-    """Register functions to be available for calling."""
-    global functions
-
-    for name, func in funcs.items():
-        functions[name] = func
-
-
-def deregister(*names):
-    """Deregister functions."""
-    global functions
-
-    for name in names:
-        if name in functions:
-            del functions[name]
-
-
-def registerAst(funcs):
-    """Register functions that need ast context to be available for calling."""
-    global astFunctions
-
-    for name, func in funcs.items():
-        astFunctions[name] = func
-
-
-def deregisterAst(*names):
-    """Deregister functions that need ast context."""
-    global astFunctions
-
-    for name in names:
-        if name in astFunctions:
-            del astFunctions[name]
-
-
-def installAstFuncs(astCtx):
-    """Install ast functions into the local symbol table."""
-    symTable = {}
-    for name, func in astFunctions.items():
-        symTable[name] = func(astCtx)
-    astCtx.setLocalSymTable(symTable)
-
-
-def get(name):
-    """Lookup a function locally and then as a service."""
-    func = functions.get(name, None)
-    if func:
-        return func
-    s = name.split(".", 1)
-    if len(s) != 2:
-        return None
-    domain = s[0]
-    service = s[1]
-    if not hass.services.has_service(domain, service):
-        return None
-
-    async def serviceCall(*args, **kwargs):
-        await hass.services.async_call(domain, service, kwargs)
-
-    return serviceCall
-
-
 def current_task():
     """Return our asyncio current task."""
     try:
@@ -196,25 +17,173 @@ def current_task():
         return asyncio.tasks.Task.current_task()
 
 
-async def runCoro(coro):
-    """Run coroutine task and update Unique task on start and exit."""
-    global UniqueTask2Name, UniqueName2Task
-    try:
-        await coro
-    except asyncio.CancelledError:
+class Handler:
+    """Define function handler functions."""
+
+    def __init__(self, hass):
+        """Initialize State."""
+        self.hass = hass
+        self.unique_task2_name = {}
+        self.unique_name2_task = {}
+
+        #
+        # initial list of available functions
+        #
+        self.functions = {
+            "event.fire": self.event_fire,
+            "task.sleep": self.async_sleep,
+            "task.unique": self.task_unique,
+            "service.call": self.service_call,
+            "service.has_service": self.service_has_service,
+        }
+
+        #
+        # Functions that take the AstEval context as a first argument,
+        # which is needed by a handful of special functions that need the
+        # ast context
+        #
+
+        self.ast_functions = {
+            "log.debug": self.get_logger_debug,
+            "log.error": self.get_logger_error,
+            "log.info": self.get_logger_info,
+            "log.warning": self.get_logger_warning,
+        }
+
+        #
+        # We create loggers for each top-level function that include
+        # that function's name.  We cache them here so we only create
+        # one for each function
+        #
+        self.loggers = {}
+
+    async def async_sleep(self, duration):
+        """Implement task.sleep()."""
+        await asyncio.sleep(float(duration))
+
+    async def event_fire(self, event_type, **kwargs):
+        """Implement event.fire()."""
+        self.hass.bus.async_fire(event_type, kwargs)
+
+    async def task_unique(self, name, kill_me=False):
+        """Implement task.unique()."""
         task = current_task()
-        if task in UniqueTask2Name:
-            UniqueName2Task.pop(UniqueTask2Name[task], None)
-            UniqueTask2Name.pop(task, None)
-        raise
-    except Exception:
-        _LOGGER.error("runCoro: " + traceback.format_exc(-1))
-    task = current_task()
-    if task in UniqueTask2Name:
-        UniqueName2Task.pop(UniqueTask2Name[task], None)
-        UniqueTask2Name.pop(task, None)
+        if name in self.unique_name2_task:
+            if not kill_me:
+                task = self.unique_name2_task[name]
+            try:
+                task.cancel()
+                await task
+            except asyncio.CancelledError:
+                pass
+            self.unique_task2_name.pop(self.unique_name2_task[name], None)
+            self.unique_name2_task.pop(name, None)
+        self.unique_name2_task[name] = task
+        self.unique_name2_task[task] = name
 
+    def service_has_service(self, domain, name):
+        """Implement service.has_service()."""
+        return self.hass.services.has_service(domain, name)
 
-def create_task(coro):
-    """Create a new task that runs a coroutine."""
-    return hass.loop.create_task(runCoro(coro))
+    async def service_call(self, domain, name, **kwargs):
+        """Implement service.call()."""
+        await self.hass.services.async_call(domain, name, kwargs)
+
+    def get_logger(self, ast_ctx, log_type, *arg, **kw):
+        """Return a logger function tied to the execution context of a function."""
+
+        if ast_ctx.name not in self.loggers:
+            #
+            # Maintain a cache for efficiency.  Remove last name (handlers)
+            # and replace with "func.{name}".
+            #
+            name = __name__
+            i = name.rfind(".")
+            if i >= 0:
+                name = f"{name[0:i]}.func.{ast_ctx.name}"
+            self.loggers[ast_ctx.name] = logging.getLogger(name)
+        return getattr(self.loggers[ast_ctx.name], log_type)
+
+    def get_logger_debug(self, ast_ctx, *arg, **kw):
+        """Implement log.debug()."""
+        return self.get_logger(ast_ctx, "debug", *arg, **kw)
+
+    def get_logger_error(self, ast_ctx, *arg, **kw):
+        """Implement log.error()."""
+        return self.get_logger(ast_ctx, "error", *arg, **kw)
+
+    def get_logger_info(self, ast_ctx, *arg, **kw):
+        """Implement log.info()."""
+        return self.get_logger(ast_ctx, "info", *arg, **kw)
+
+    def get_logger_warning(self, ast_ctx, *arg, **kw):
+        """Implement log.warning()."""
+        return self.get_logger(ast_ctx, "warning", *arg, **kw)
+
+    def register(self, funcs):
+        """Register functions to be available for calling."""
+        for name, func in funcs.items():
+            self.functions[name] = func
+
+    def deregister(self, *names):
+        """Deregister functions."""
+        for name in names:
+            if name in self.functions:
+                del self.functions[name]
+
+    def register_ast(self, funcs):
+        """Register functions that need ast context to be available for calling."""
+        for name, func in funcs.items():
+            self.ast_functions[name] = func
+
+    def deregister_ast(self, *names):
+        """Deregister functions that need ast context."""
+        for name in names:
+            if name in self.ast_functions:
+                del self.ast_functions[name]
+
+    def install_ast_funcs(self, ast_ctx):
+        """Install ast functions into the local symbol table."""
+        sym_table = {}
+        for name, func in self.ast_functions.items():
+            sym_table[name] = func(ast_ctx)
+        ast_ctx.set_local_sym_table(sym_table)
+
+    def get(self, name):
+        """Lookup a function locally and then as a service."""
+        func = self.functions.get(name, None)
+        if func:
+            return func
+        parts = name.split(".", 1)
+        if len(parts) != 2:
+            return None
+        domain = parts[0]
+        service = parts[1]
+        if not self.hass.services.has_service(domain, service):
+            return None
+
+        async def service_call(*args, **kwargs):
+            await self.hass.services.async_call(domain, service, kwargs)
+
+        return service_call
+
+    async def run_coro(self, coro):
+        """Run coroutine task and update unique task on start and exit."""
+        try:
+            await coro
+        except asyncio.CancelledError:
+            task = current_task()
+            if task in self.unique_task2_name:
+                self.unique_name2_task.pop(self.unique_task2_name[task], None)
+                self.unique_task2_name.pop(task, None)
+            raise
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.error("run_coro: %s", traceback.format_exc(-1))
+        task = current_task()
+        if task in self.unique_task2_name:
+            self.unique_name2_task.pop(self.unique_task2_name[task], None)
+            self.unique_task2_name.pop(task, None)
+
+    def create_task(self, coro):
+        """Create a new task that runs a coroutine."""
+        return self.hass.loop.create_task(self.run_coro(coro))

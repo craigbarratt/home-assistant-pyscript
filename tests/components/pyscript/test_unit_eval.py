@@ -1,7 +1,7 @@
 """Unit tests for Python interpreter."""
 import asyncio
 
-import homeassistant.components.pyscript.eval as eval
+from homeassistant.components.pyscript.eval import AstEval
 import homeassistant.components.pyscript.handler as handler
 import homeassistant.components.pyscript.state as state
 
@@ -12,6 +12,7 @@ evalTests = [
     ["1-1", 0],
     ["z = 1+2+3; a = z + 1; a + 3", 10],
     ["z = 1+2+3; a = z + 1; a - 3", 4],
+    ["x = 1; -x", -1],
     ["x = 1; x < 2", 1],
     ["x = 1; 0 < x < 2", 1],
     ["x = 1; 0 < x < 2 < -x", 0],
@@ -164,21 +165,23 @@ lst = [6, 10]
 ]
 
 
-async def runOneTest(t):
+async def run_one_test(test_data, state_func, handler_func):
     """Run one interpreter test."""
-    str, expect = t
-    a = eval.AstEval("test")
-    a.parse(str)
-    if a.getException() is not None:
-        print(f"Parsing {str} failed: {a.getException()}")
-    # print(a.dump())
-    result = await a.eval()
+    source, expect = test_data
+    ast = AstEval("test", state_func=state_func, handler_func=handler_func)
+    ast.parse(source)
+    if ast.get_exception() is not None:
+        print(f"Parsing {source} failed: {ast.get_exception()}")
+    # print(ast.dump())
+    result = await ast.eval()
     assert result == expect
 
 
 def test_eval(hass):
     """Test interpreter."""
-    state.hassSet(hass)
-    handler.hassSet(hass)
-    for t in evalTests:
-        asyncio.run(runOneTest(t))
+    handler_func = handler.Handler(hass)
+    state_func = state.State(hass, handler_func)
+    state_func.register_functions()
+
+    for test_data in evalTests:
+        asyncio.run(run_one_test(test_data, state_func, handler_func))

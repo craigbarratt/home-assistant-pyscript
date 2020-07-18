@@ -5,65 +5,56 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 
-hass = None
+class Event:
+    """Defined event functions."""
 
+    def __init__(self, hass):
+        """Initialize Event."""
 
-def hassSet(h):
-    """Initialize hass handle."""
-    global hass
-    hass = h
+        self.hass = hass
+        #
+        # notify message queues by event type
+        #
+        self.notify = {}
+        self.notify_remove = {}
 
+    async def event_listener(self, event):
+        """Listen callback for given event which updates any notifications."""
 
-#
-# notify message queues by event type
-#
-Notify = {}
-NotifyRemove = {}
+        _LOGGER.debug("event_listener(%s)", event)
+        func_args = {
+            "trigger_type": "event",
+            "event_type": event.event_type,
+        }
+        func_args.update(event.data)
+        await self.update(event.event_type, func_args)
 
+    def notify_add(self, event_type, queue):
+        """Register to notify for events of given type to be sent to queue."""
 
-async def event_listener(ev):
-    """Listen callback for given event which updates any notifications."""
-    _LOGGER.debug(f"event_listener({ev})")
-    funcArgs = {
-        "trigger_type": "event",
-        "event_type": ev.event_type,
-    }
-    funcArgs.update(ev.data)
-    await update(ev.event_type, funcArgs)
+        if event_type not in self.notify:
+            self.notify[event_type] = set()
+            _LOGGER.debug("event.notify_add(%s) -> adding event listener", event_type)
+            self.notify_remove[event_type] = self.hass.bus.async_listen(
+                event_type, self.event_listener
+            )
+        self.notify[event_type].add(queue)
 
+    def notify_del(self, event_type, queue):
+        """Unregister to notify for events of given type for given queue."""
 
-def notifyAdd(eventType, queue):
-    """Register to notify for events of given type to be sent to queue."""
-    global Notify
+        if event_type not in self.notify or queue not in self.notify[event_type]:
+            return
+        self.notify[event_type].discard(queue)
+        if len(self.notify[event_type]) == 0:
+            self.notify_remove[event_type]()
+            _LOGGER.debug("event.notify_del(%s) -> removing event listener", event_type)
+            del self.notify_remove[event_type]
 
-    if eventType not in Notify:
-        Notify[eventType] = set()
-        _LOGGER.debug(f"event.notifyAdd({eventType}) -> adding event listener")
-        NotifyRemove[eventType] = hass.bus.async_listen(eventType, event_listener)
-    Notify[eventType].add(queue)
+    async def update(self, event_type, func_args):
+        """Deliver all notifications for an event of the given type."""
 
-
-def notifyDel(eventType, queue):
-    """Unregister to notify for events of given type for given queue."""
-    global Notify
-
-    if eventType not in Notify or queue not in Notify[eventType]:
-        return
-    Notify[eventType].discard(queue)
-    if len(Notify[eventType]) == 0:
-        NotifyRemove[eventType]()
-        _LOGGER.debug(f"event.notifyDel({eventType}) -> removing event listener")
-        del NotifyRemove[eventType]
-
-
-async def update(eventType, funcArgs):
-    """Deliver all notifications for an event of the given type."""
-    global Notify
-
-    _LOGGER.debug(f"event.update({eventType}, {vars}, {funcArgs})")
-    if eventType in Notify:
-        for q in Notify[eventType]:
-            try:
-                await q.put(["event", funcArgs])
-            except Exception as err:
-                _LOGGER.error(f"notify Q put failed: {err}")
+        _LOGGER.debug("event.update(%s, %s, %s)", event_type, vars, func_args)
+        if event_type in self.notify:
+            for queue in self.notify[event_type]:
+                await queue.put(["event", func_args])

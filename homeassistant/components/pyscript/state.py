@@ -2,129 +2,113 @@
 
 import logging
 
-import homeassistant.components.pyscript.handler as handler
-
 _LOGGER = logging.getLogger(__name__)
 
-#
-# notify message queues by variable
-#
-Notify = {}
 
-#
-# Last value of state variable notifications.  We maintain this
-# so that trigger evaluation can use the last notified value,
-# rather than fetching the current value, which is subject to
-# race conditions multiple state variables are set.
-#
-NotifyVarLast = {}
+class State:
+    """Class for state functions."""
 
+    def __init__(self, hass, handler_func):
+        """Initialize State."""
 
-hass = None
+        self.hass = hass
+        self.handler = handler_func
+        #
+        # notify message queues by variable
+        #
+        self.notify = {}
 
+        #
+        # Last value of state variable notifications.  We maintain this
+        # so that trigger evaluation can use the last notified value,
+        # rather than fetching the current value, which is subject to
+        # race conditions multiple state variables are set.
+        #
+        self.notify_var_last = {}
 
-def notifyAdd(varNames, queue):
-    """Register to notify state variables changes to be sent to queue."""
-    global Notify
+    def notify_add(self, var_names, queue):
+        """Register to notify state variables changes to be sent to queue."""
 
-    for varName in varNames if isinstance(varNames, list) else [varNames]:
-        s = varName.split(".")
-        if len(s) != 2 and len(s) != 3:
-            continue
-        v = f"{s[0]}.{s[1]}"
-        if v not in Notify:
-            Notify[v] = {}
-        Notify[v][queue] = varNames
+        for var_name in var_names if isinstance(var_names, list) else [var_names]:
+            parts = var_name.split(".")
+            if len(parts) != 2 and len(parts) != 3:
+                continue
+            state_var_name = f"{parts[0]}.{parts[1]}"
+            if state_var_name not in self.notify:
+                self.notify[state_var_name] = {}
+            self.notify[state_var_name][queue] = var_names
 
+    def notify_del(self, var_names, queue):
+        """Unregister notify of state variables changes for given queue."""
 
-def notifyDel(varNames, queue):
-    """Unregister notify of state variables changes for given queue."""
-    global Notify
+        for var_name in var_names if isinstance(var_names, list) else [var_names]:
+            parts = var_name.split(".")
+            if len(parts) != 2 and len(parts) != 3:
+                continue
+            state_var_name = f"{parts[0]}.{parts[1]}"
+            if (
+                state_var_name not in self.notify
+                or queue not in self.notify[state_var_name]
+            ):
+                return
+            del self.notify[state_var_name][queue]
 
-    for varName in varNames if isinstance(varNames, list) else [varNames]:
-        s = varName.split(".")
-        if len(s) != 2 and len(s) != 3:
-            continue
-        v = f"{s[0]}.{s[1]}"
-        if v not in Notify or queue not in Notify[v]:
+    async def update(self, new_vars, func_args):
+        """Deliver all notifications for state variable changes."""
+
+        _LOGGER.debug("state.update(%s, %s)", new_vars, func_args)
+        notify = {}
+        for var_name, var_val in new_vars.items():
+            if var_name in self.notify:
+                self.notify_var_last[var_name] = var_val
+                notify.update(self.notify[var_name])
+
+        for queue, var_names in notify.items():
+            await queue.put(["state", [self.notify_var_get(var_names), func_args]])
+
+    def notify_var_get(self, var_names):
+        """Return the most recent value of a state variable change."""
+        new_vars = {}
+        for var_name in var_names if var_names is not None else []:
+            if var_name in self.notify_var_last:
+                new_vars[var_name] = self.notify_var_last[var_name]
+        return new_vars
+
+    def set(self, var_name, value, attributes=None):
+        """Set a state variable and optional attributes in hass."""
+        if len(var_name.split(".")) != 2:
+            _LOGGER.error(
+                "invalid variable name %s (should be 'domain.entity')", var_name
+            )
             return
-        del Notify[v][queue]
+        _LOGGER.debug("setting %s = %s, attr = %s", var_name, value, attributes)
+        self.hass.states.async_set(var_name, value, attributes)
 
+    def exist(self, var_name):
+        """Check if a state variable value or attribute exists in hass."""
+        parts = var_name.split(".")
+        if len(parts) != 2 and len(parts) != 3:
+            return False
+        value = self.hass.states.get(f"{parts[0]}.{parts[1]}")
+        return value and (len(parts) == 2 or value.attributes.get(parts[2]) is not None)
 
-async def update(vars, funcArgs):
-    """Deliver all notifications for state variable changes."""
-    global Notify, NotifyVarLast
+    def get(self, var_name):
+        """Get a state variable value or attribute from hass."""
+        parts = var_name.split(".")
+        if len(parts) != 2 and len(parts) != 3:
+            return None
+        value = self.hass.states.get(f"{parts[0]}.{parts[1]}")
+        if not value:
+            return None
+        if len(parts) == 2:
+            _LOGGER.debug("state.get %s = %s", var_name, value.state)
+            return value.state
+        return value.attributes.get(parts[2])
 
-    _LOGGER.debug(f"state.update({vars}, {funcArgs})")
-    notify = {}
-    for varName, varVal in vars.items():
-        if varName in Notify:
-            NotifyVarLast[varName] = varVal
-            notify.update(Notify[varName])
-
-    for q, varNames in notify.items():
-        try:
-            await q.put(["state", [notifyVarGet(varNames), funcArgs]])
-        except Exception as err:
-            _LOGGER.error(f"notify Q put failed: {err}")
-
-
-def notifyVarGet(varNames):
-    """Return the most recent value of a state variable change."""
-    vars = {}
-    for varName in varNames if varNames is not None else []:
-        if varName in NotifyVarLast:
-            vars[varName] = NotifyVarLast[varName]
-    return vars
-
-
-def set(varName, value, attributes=None):
-    """Set a state variable and optional attributes in hass."""
-    if len(varName.split(".")) != 2:
-        _LOGGER.error(f"invalid variable name {varName} (should be 'domain.entity')")
-        return
-    _LOGGER.debug(f"setting {varName} = {value}, attr = {attributes}")
-    hass.states.async_set(varName, value, attributes)
-
-
-#
-# Check if a State variable exists.  Variables are of the form domain.entity
-# or domain.entity.attribute.
-#
-def exist(varName):
-    """Check if a state variable value or attribute exists in hass."""
-    s = varName.split(".")
-    if len(s) != 2 and len(s) != 3:
-        return False
-    value = hass.states.get(f"{s[0]}.{s[1]}")
-    if value and (len(s) == 2 or value.attributes.get(s[2]) is not None):
-        return True
-    else:
-        return False
-
-
-def get(varName):
-    """Get a state variable value or attribute from hass."""
-    s = varName.split(".")
-    if len(s) != 2 and len(s) != 3:
-        return None
-    value = hass.states.get(f"{s[0]}.{s[1]}")
-    if not value:
-        return None
-    if len(s) == 2:
-        _LOGGER.debug(f"state.get {varName} = {value.state}")
-        return value.state
-    return value.attributes.get(s[2])
-
-
-functions = {
-    "state.get": lambda *arg, **kw: get(*arg, **kw),
-    "state.set": lambda *arg, **kw: set(*arg, **kw),
-}
-
-
-def hassSet(h):
-    """Initialize hass handle and register built-ins."""
-    global hass
-    hass = h
-    handler.register(functions)
+    def register_functions(self):
+        """Register state functions."""
+        functions = {
+            "state.get": self.get,
+            "state.set": self.set,
+        }
+        self.handler.register(functions)
