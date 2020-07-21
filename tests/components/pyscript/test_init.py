@@ -15,7 +15,7 @@ from tests.async_mock import mock_open, patch
 async def setup_script(hass, notify_q, now, source):
     """Initialize and load the given pyscript."""
     scripts = [
-        "/some/config/dir/pyscripts/hello.py",
+        "/some/config/dir/pyscript/hello.py",
     ]
     with patch(
         "homeassistant.components.pyscript.os.path.isdir", return_value=True
@@ -59,7 +59,7 @@ async def test_setup_fails_on_no_dir(hass, caplog):
         res = await async_setup_component(hass, "pyscript", {})
 
     assert not res
-    assert "Folder pyscripts not found in configuration folder" in caplog.text
+    assert "Folder pyscript not found in configuration folder" in caplog.text
 
 
 async def test_service_exists(hass):
@@ -321,7 +321,7 @@ def func5(var_name=None, value=None):
         # now reload the other source file
         #
         scripts = [
-            "/some/config/dir/pyscripts/hello.py",
+            "/some/config/dir/pyscript/hello.py",
         ]
         with patch(
             "homeassistant.components.pyscript.os.path.isdir", return_value=True
