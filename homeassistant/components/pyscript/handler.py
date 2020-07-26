@@ -125,22 +125,10 @@ class Handler:
         for name, func in funcs.items():
             self.functions[name] = func
 
-    def deregister(self, *names):
-        """Deregister functions."""
-        for name in names:
-            if name in self.functions:
-                del self.functions[name]
-
     def register_ast(self, funcs):
         """Register functions that need ast context to be available for calling."""
         for name, func in funcs.items():
             self.ast_functions[name] = func
-
-    def deregister_ast(self, *names):
-        """Deregister functions that need ast context."""
-        for name in names:
-            if name in self.ast_functions:
-                del self.ast_functions[name]
 
     def install_ast_funcs(self, ast_ctx):
         """Install ast functions into the local symbol table."""
