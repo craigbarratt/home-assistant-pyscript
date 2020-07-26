@@ -38,12 +38,12 @@ parseDateTimeTests = [
     ["16:01", 0, dt(2019, 9, 1, 16, 1, 0, 0)],
     ["14:56", 1, dt(2019, 9, 2, 14, 56, 0, 0)],
     ["8:00:23.6", 1, dt(2019, 9, 2, 8, 0, 23, 600000)],
-    # ["sunrise",                 0, dt(2019, 9, 1,  6, 39, 6, 0)],
-    # ["sunrise",                 1, dt(2019, 9, 2,  6, 39, 55, 0)],
-    # ["sunrise",                 2, dt(2019, 9, 3,  6, 40, 45, 0)],
-    # ["sunrise + 1hr",           0, dt(2019, 9, 1,  7, 39, 6, 0)],
-    # ["sunset",                  0, dt(2019, 9, 1,  19, 37, 25, 0)],
-    # ["2019/11/4 sunset + 1min", 0, dt(2019, 11, 4,  17, 8, 10, 0)],
+    ["sunrise", 0, dt(2019, 9, 1, 6, 39, 6, 0)],
+    ["sunrise", 1, dt(2019, 9, 2, 6, 39, 6, 0)],
+    ["sunrise", 2, dt(2019, 9, 3, 6, 39, 6, 0)],
+    ["sunrise + 1hr", 0, dt(2019, 9, 1, 7, 39, 6, 0)],
+    ["sunset", 0, dt(2019, 9, 1, 6, 39, 6, 0)],
+    ["2019/11/4 sunset + 1min", 0, dt(2019, 11, 4, 6, 40, 6, 0)],
 ]
 
 
@@ -62,10 +62,16 @@ async def test_parse_date_time(hass):
     trig = trigger.TrigTime(hass, handler_func)
 
     now = dt(2019, 9, 1, 13, 0, 0, 0)
+    #
+    # the mock forces sunrise and sunset to be the same
+    #
+    sunrise = dt(2019, 9, 1, 6, 39, 6, 0)
 
     with patch(
         "homeassistant.helpers.condition.dt_util.utcnow", return_value=now
-    ), patch("homeassistant.util.dt.utcnow", return_value=now):
+    ), patch("homeassistant.util.dt.utcnow", return_value=now), patch(
+        "homeassistant.helpers.sun.get_astral_event_date", return_value=sunrise
+    ):
         # await async_setup_component(hass, "pyscript", {})
         for test_data in parseDateTimeTests:
             spec, date_offset, expect = test_data
