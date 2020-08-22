@@ -1,3 +1,8 @@
+# This Repsository is Deprecated
+
+Pyscript is now available as a HACS custom integration.  The [respository is here](https://github.com/custom-components/pyscript).
+
+
 # Home Assistant Pyscript - Python Scripting Component
 
 This integration allows you to write Python functions and scripts that can implement a wide range of
